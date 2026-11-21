@@ -233,7 +233,7 @@
           Private Velvet Screening Room
         </div>
         <h1 class="font-serif text-3xl sm:text-4xl font-bold text-white tracking-tight">
-          Cinema <span class="text-amber-400 italic font-normal">for</span> Two <span class="align-middle px-2 py-0.5 rounded-md bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs font-bold tracking-wider">v2</span>
+          Cinema <span class="text-amber-400 italic font-normal">for</span> Two <span class="align-middle px-2 py-0.5 rounded-md bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs font-bold tracking-wider">v3</span>
         </h1>
         <p class="text-gray-400 text-sm sm:text-base mt-2 max-w-sm mx-auto leading-relaxed">
           Sync movies across miles, share live reactions, and stamp every date night into your shared passport.
@@ -381,7 +381,7 @@
           </button>
           <div>
             <div class="flex items-center gap-2">
-              <span class="font-serif text-lg sm:text-xl font-bold text-white tracking-tight">Cinema <span class="text-amber-400 italic font-normal">for</span> Two</span> <span class="px-1.5 py-0.5 rounded-md bg-amber-500/15 border border-amber-500/30 text-amber-300 text-[10px] font-bold tracking-wider">v2</span>
+              <span class="font-serif text-lg sm:text-xl font-bold text-white tracking-tight">Cinema <span class="text-amber-400 italic font-normal">for</span> Two</span> <span class="px-1.5 py-0.5 rounded-md bg-amber-500/15 border border-amber-500/30 text-amber-300 text-[10px] font-bold tracking-wider">v3</span>
             </div>
             <p class="text-[11px] text-gray-400 hidden sm:block">Signed in as <span id="headerUserName" class="text-amber-300 font-medium">You</span></p>
           </div>
@@ -432,6 +432,9 @@
                 </button>
                 <button type="button" data-source-tab="samples" class="source-tab-btn flex-1 sm:flex-initial px-3 py-2 rounded-lg text-xs font-semibold transition text-gray-300 hover:text-white cursor-pointer">
                   🎬 Sample Clips
+                </button>
+                <button type="button" data-source-tab="external" class="source-tab-btn flex-1 sm:flex-initial px-3 py-2 rounded-lg text-xs font-semibold transition text-gray-300 hover:text-white cursor-pointer">
+                  🌐 External Site
                 </button>
               </div>
 
@@ -523,12 +526,41 @@
                 </button>
               </div>
             </div>
+            <div id="tabPanel-external" class="source-tab-panel hidden">
+              <p class="text-xs text-gray-400 leading-relaxed mb-2">Watching on another site? Open it in its own tab and use Cinema for Two as the companion — faces, ready check, pause pings and scene notes stay here.</p>
+              <div class="flex flex-col sm:flex-row gap-2">
+                <input id="companionUrlInput" type="url" value="https://dulo.mov/" placeholder="https://dulo.mov/" class="flex-1 px-3.5 py-2.5 rounded-xl bg-black/45 border border-white/15 focus:border-amber-400 text-sm text-white placeholder-gray-500 outline-none transition" />
+                <a id="companionOpenBtn" href="https://dulo.mov/" target="_blank" rel="noopener" class="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-obsidian font-semibold text-xs transition flex items-center justify-center cursor-pointer">Open site in new tab</a>
+              </div>
+            </div>
           </section>
 
           <!-- 2. Video Player Stage with Ambient Glow & Floating Reaction Layer -->
           <section class="cinema-stage-wrapper">
             <div id="ambientGlow" class="cinema-ambient-glow"></div>
 
+
+            <!-- v3: Companion Sync Deck — for watching a movie on an external site -->
+            <div id="companionDeck" class="hidden relative z-10 rounded-2xl overflow-hidden bg-gradient-to-br from-[#161022] via-[#0c0e17] to-[#1f131b] border border-white/10 shadow-2xl p-4 sm:p-6">
+              <div class="flex flex-wrap items-center justify-between gap-2 mb-1">
+                <h3 class="font-serif text-lg sm:text-2xl font-bold text-white">Companion Sync Control Deck</h3>
+                <span id="companionTargetBadge" class="px-2.5 py-1 rounded-full bg-white/10 border border-white/15 font-mono text-[11px] text-amber-300">https://dulo.mov/</span>
+              </div>
+              <p class="text-xs text-gray-400 leading-relaxed mb-4">Keep the movie site open in your separate tab and use this deck together to count down starts, ping when someone pauses, and log scene timestamps.</p>
+              <div class="flex flex-wrap items-center gap-2 mb-3">
+                <button id="companionReadyBtn" type="button" class="px-4 py-2.5 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/35 text-rose-300 font-semibold text-xs transition cursor-pointer">3-2-1 Ready Check</button>
+                <button id="companionPausedBtn" type="button" class="px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-gray-200 font-semibold text-xs transition cursor-pointer">I paused — catch up</button>
+                <button id="companionCaughtUpBtn" type="button" class="px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-gray-200 font-semibold text-xs transition cursor-pointer">I'm caught up</button>
+              </div>
+              <div class="flex flex-col sm:flex-row gap-2 mb-3">
+                <input id="companionTimestampInput" type="text" placeholder="Scene time, e.g. 00:42:10" class="flex-1 px-3.5 py-2.5 rounded-xl bg-black/45 border border-white/15 focus:border-amber-400 text-sm text-white placeholder-gray-500 outline-none transition" />
+                <button id="companionMarkSceneBtn" type="button" class="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-obsidian font-semibold text-xs transition cursor-pointer">Mark scene</button>
+              </div>
+              <div id="companionPauseAlert" class="hidden rounded-xl px-3.5 py-2.5 bg-rose-500/20 border border-rose-400/45 flex items-center justify-between gap-2 text-xs text-rose-100">
+                <span id="companionPauseAlertText" class="font-semibold">Partner paused to catch up!</span>
+                <button id="companionClearAlertBtn" type="button" class="text-[11px] text-rose-200 hover:text-white underline cursor-pointer">Dismiss</button>
+              </div>
+            </div>
             <div id="playerStage" class="relative z-10 rounded-2xl overflow-hidden bg-black border border-white/10 shadow-2xl aspect-video w-full">
               <!-- Empty Placeholder Screen -->
               <div id="emptyPlayerPlaceholder" class="absolute inset-0 flex flex-col items-center justify-center text-center p-6 bg-gradient-to-b from-[#101420] to-[#07090e]">
@@ -888,7 +920,7 @@
 // =========================================================================
 
 const PEERJS_HOST_PREFIX = 'c2t-';
-const APP_VERSION = '2.0.0'; // v2: voice & video calling, lounge, floating PiP
+const APP_VERSION = '3.0.0'; // v3: companion mode (movies option) — watch on an external site
 // ICE servers: Google + Cloudflare STUN for direct links, PeerJS's own
 // TURN (its built-in default, which a custom config otherwise discards)
 // as the relay fallback. Open Relay was dropped 22 Nov 2026: its TLS
@@ -962,6 +994,11 @@ const state = {
   inLounge: false,
   pipCornerIdx: 0, // 0 bottom-right, 1 bottom-left, 2 top-right, 3 top-left
   pipVisible: false,
+  // v3 — companion mode (movies option): watch on an external site in its
+  // own tab; this app stays the companion (faces, ready check, pause pings,
+  // scene notes). No video is embedded or synced from the external site.
+  companionMode: false,
+  companionUrl: 'https://dulo.mov/',
   logLines: [], // parsed JSONL log objects, in order
   pendingImportLines: [], // .jsonl lines loaded on the welcome screen, applied on room entry
   readyCheck: { active: false, startedBy: '', startedByUid: '', readyUsers: {}, countdownStartAt: null }
@@ -1002,6 +1039,18 @@ const dom = {
   pipHideBtn: document.getElementById('pipHideBtn'),
   pipEndBtn: document.getElementById('pipEndBtn'),
   showFacesBtn: document.getElementById('showFacesBtn'),
+  companionDeck: document.getElementById('companionDeck'),
+  companionUrlInput: document.getElementById('companionUrlInput'),
+  companionOpenBtn: document.getElementById('companionOpenBtn'),
+  companionTargetBadge: document.getElementById('companionTargetBadge'),
+  companionReadyBtn: document.getElementById('companionReadyBtn'),
+  companionPausedBtn: document.getElementById('companionPausedBtn'),
+  companionCaughtUpBtn: document.getElementById('companionCaughtUpBtn'),
+  companionTimestampInput: document.getElementById('companionTimestampInput'),
+  companionMarkSceneBtn: document.getElementById('companionMarkSceneBtn'),
+  companionPauseAlert: document.getElementById('companionPauseAlert'),
+  companionPauseAlertText: document.getElementById('companionPauseAlertText'),
+  companionClearAlertBtn: document.getElementById('companionClearAlertBtn'),
   headerUserName: document.getElementById('headerUserName'),
   presenceBadge: document.getElementById('presenceBadge'),
   presenceDot: document.getElementById('presenceDot'),
@@ -1871,6 +1920,26 @@ function exitLoungeToTheater() {
   if (state.remoteStream || state.localStream) showPip(true);
 }
 
+// --- Companion Mode (v3) -------------------------------------------------
+// The movie plays on an external site in its own tab; this app is the
+// companion. Pause pings and scene notes ride the same PeerJS link.
+function showCompanionPauseAlert(name) {
+  if (dom.companionPauseAlertText) {
+    dom.companionPauseAlertText.textContent = (name || 'Partner') + ' paused — catch up, then tap "I\'m caught up".';
+  }
+  if (dom.companionPauseAlert) dom.companionPauseAlert.classList.remove('hidden');
+}
+
+function hideCompanionPauseAlert() {
+  if (dom.companionPauseAlert) dom.companionPauseAlert.classList.add('hidden');
+}
+
+function sendCompanionPing(ping) {
+  sendPeerMessage({ kind: 'companion-ping', from: state.userId, fromName: state.userName, at: Date.now(), ping });
+  if (ping === 'paused') showCompanionPauseAlert(state.userName || 'You');
+  else hideCompanionPauseAlert();
+}
+
 // --- Floating Picture-in-Picture overlay ---------------------------------
 function setPipCorner(idx) {
   state.pipCornerIdx = ((idx || 0) + PIP_CORNERS.length) % PIP_CORNERS.length;
@@ -2022,6 +2091,15 @@ function handlePeerMessage(msg) {
 
   if (msg.kind === 'ready-cancel') {
     hideReadyCheck();
+    return;
+  }
+
+  // v3: companion-mode pause ping — "I paused, catch up" / "I'm caught up".
+  // The external video is not in this app, so this is a manual ping, not
+  // an automatic playback event.
+  if (msg.kind === 'companion-ping') {
+    if (msg.ping === 'paused') showCompanionPauseAlert(msg.fromName || 'Partner');
+    else hideCompanionPauseAlert();
     return;
   }
 
@@ -2682,6 +2760,11 @@ function switchSourceTab(tabKey) {
   document.querySelectorAll('.source-tab-panel').forEach((panel) => {
     panel.classList.toggle('hidden', panel.id !== `tabPanel-${tabKey}`);
   });
+  // v3: External Site = companion mode — the movie plays in its own tab,
+  // so the player stage hides and the Companion Deck takes its place.
+  state.companionMode = tabKey === 'external';
+  if (dom.playerStage) dom.playerStage.classList.toggle('hidden', state.companionMode);
+  if (dom.companionDeck) dom.companionDeck.classList.toggle('hidden', !state.companionMode);
 }
 
 // =========================================================================
@@ -3006,11 +3089,13 @@ function renderWhisperMessages(messages) {
   dom.whisperMessagesList.scrollTop = dom.whisperMessagesList.scrollHeight;
 }
 
-function sendWhisperMessage(text) {
+function sendWhisperMessage(text, timeTagOverride) {
   const clean = text.trim();
   if (!clean) return;
 
-  const timeTag = state.mediaType !== 'none' ? formatTime(getPlayerCurrentTime()) : '';
+  const timeTag = timeTagOverride !== undefined
+    ? timeTagOverride
+    : (state.mediaType !== 'none' ? formatTime(getPlayerCurrentTime()) : '');
   const line = appendLog('whisper', {
     text: clean,
     movieTimestamp: timeTag,
@@ -3374,6 +3459,23 @@ dom.callPip.addEventListener('pointerdown', pipDragStart);
 dom.callPip.addEventListener('pointermove', pipDragMove);
 dom.callPip.addEventListener('pointerup', pipDragEnd);
 dom.callPip.addEventListener('pointercancel', pipDragEnd);
+
+// v3 — Companion Mode deck controls.
+dom.companionReadyBtn.addEventListener('click', triggerReadyCheck);
+dom.companionPausedBtn.addEventListener('click', () => sendCompanionPing('paused'));
+dom.companionCaughtUpBtn.addEventListener('click', () => sendCompanionPing('caught-up'));
+dom.companionMarkSceneBtn.addEventListener('click', () => {
+  const ts = dom.companionTimestampInput.value.trim() || '00:00';
+  sendWhisperMessage('Scene at ' + ts, ts);
+  dom.companionTimestampInput.value = '';
+});
+dom.companionClearAlertBtn.addEventListener('click', hideCompanionPauseAlert);
+dom.companionUrlInput.addEventListener('input', () => {
+  const url = dom.companionUrlInput.value.trim() || 'https://dulo.mov/';
+  state.companionUrl = url;
+  if (dom.companionOpenBtn) dom.companionOpenBtn.href = url;
+  if (dom.companionTargetBadge) dom.companionTargetBadge.textContent = url;
+});
 
 dom.copyInviteBtn.addEventListener('click', () => {
   const shareUrl = `${window.location.origin}${window.location.pathname}#room=${state.roomCode}`;
