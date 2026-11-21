@@ -1659,6 +1659,16 @@ function mountYouTubePlayer(videoId) {
       onStateChange: (event) => {
         if (state.isRemoteSync) return;
         if (event.data === YT.PlayerState.PLAYING) {
+          // Refresh the banner title now that the video is actually playing:
+          // getVideoData() is empty at onReady, and loadVideoById never fires
+          // onReady again, so without this the "Loading..." text sticks.
+          const data = event.target.getVideoData && event.target.getVideoData();
+          if (data && data.title) {
+            state.mediaTitle = data.title;
+            dom.nowPlayingTitle.textContent = data.title;
+          } else if (state.mediaTitle) {
+            dom.nowPlayingTitle.textContent = state.mediaTitle;
+          }
           updatePlayButtonUI(true);
           broadcastPlaybackChange(true, getPlayerCurrentTime());
         } else if (event.data === YT.PlayerState.PAUSED) {
@@ -2680,7 +2690,7 @@ document.querySelectorAll('.sample-clip-btn').forEach((btn) => {
       state.mediaUrl = ytId;
       state.mediaTitle = sampleTitle;
       dom.nowPlayingBanner.classList.remove('hidden');
-      dom.nowPlayingTitle.textContent = 'Loading YouTube video...';
+      dom.nowPlayingTitle.textContent = sampleTitle;
       mountYouTubePlayer(ytId);
       syncMediaToRoom('youtube', ytId, sampleTitle);
     } else {
