@@ -1707,6 +1707,12 @@ window.onYouTubeIframeAPIReady = function () {
 };
 
 function mountYouTubePlayer(videoId) {
+  if (!/^[a-zA-Z0-9_-]{11}$/.test(videoId || '')) {
+    dom.nowPlayingBanner.classList.remove('hidden');
+    dom.nowPlayingTitle.textContent = 'That YouTube link did not play — check the full link and try again.';
+    showToast('That YouTube link did not play — check the full link and try again.', 'rose');
+    return;
+  }
   dom.emptyPlayerPlaceholder.classList.add('hidden');
   dom.html5VideoPlayer.pause();
   dom.html5VideoPlayer.classList.add('hidden');
@@ -1747,6 +1753,17 @@ function mountYouTubePlayer(videoId) {
           applyRemotePlaybackState(state.roomData.playback, true);
         }
       },
+      onError: (event) => {
+        const code = event && event.data;
+        const why = (code === 101 || code === 150)
+          ? 'the owner turned off embedding'
+          : (code === 100)
+            ? 'it may be private or deleted'
+            : 'check the link and try another video';
+        dom.nowPlayingBanner.classList.remove('hidden');
+        dom.nowPlayingTitle.textContent = `This YouTube video can't play here — ${why}.`;
+        showToast(`This YouTube video can't play here — ${why}.`, 'rose');
+      },
       onStateChange: (event) => {
         if (state.isRemoteSync) return;
         if (event.data === YT.PlayerState.PLAYING) {
@@ -1783,6 +1800,13 @@ function mountHtml5Video(srcUrl, titleLabel) {
     dom.html5VideoPlayer.src = srcUrl;
     dom.html5VideoPlayer.load();
   }
+  // A web page pasted as a "video link" fails here — say so plainly
+  // instead of leaving a dead player.
+  dom.html5VideoPlayer.onerror = () => {
+    dom.nowPlayingBanner.classList.remove('hidden');
+    dom.nowPlayingTitle.textContent = 'This link did not play — it may be a web page, not a video file. Paste a YouTube link or a direct .mp4 link.';
+    showToast('This link did not play — it may be a web page, not a video file.', 'rose');
+  };
 
   state.mediaTitle = titleLabel || 'Movie Stream';
   dom.nowPlayingBanner.classList.remove('hidden');
@@ -2742,6 +2766,16 @@ dom.urlLoadForm.addEventListener('submit', async (e) => {
     syncMediaToRoom('youtube', ytId, 'YouTube Feature');
     showToast('YouTube video synced to room 🎬', 'emerald');
   } else {
+    // Only real video files play in the built-in player. A video PAGE
+    // (YouTube link with a bad ID, Pexels/TikTok/Instagram/Facebook page)
+    // is not a video file — refuse it with guidance instead of mounting a
+    // player that can never play and syncing the broken entry to the room.
+    const looksLikeVideoFile = /\.(mp4|webm|mov|m4v|ogv|ogg)(\?|#|$)/i.test(rawUrl);
+    const looksLikeVideoPage = /(youtube\.com|youtu\.be|pexels\.com\/video|tiktok\.com|instagram\.com|facebook\.com|fb\.watch|vimeo\.com\/\d|dailymotion\.com)/i.test(rawUrl);
+    if (!looksLikeVideoFile || looksLikeVideoPage) {
+      showToast('That link is a web page, not a video file — paste a YouTube link or a direct .mp4 link.', 'rose');
+      return;
+    }
     const cleanTitle = rawUrl.split('/').pop()?.split('?')[0] || 'Shared Video Stream';
     state.mediaType = 'url';
     state.mediaUrl = rawUrl;
