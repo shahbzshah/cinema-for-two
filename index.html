@@ -1433,6 +1433,7 @@ function setupPeer() {
 function attachConn(conn) {
   if (!conn) return;
   debugLog('connection object with ' + (conn.peer || '?') + ' (offer arrived/sent)');
+  hookIceDiagnostics(conn);
   // Only one partner: replace any previous connection.
   if (state.conn && state.conn !== conn) {
     try { state.conn.close(); } catch (_) {}
@@ -1734,13 +1735,38 @@ function updateDebugPanel() {
     window.__c2t = state;
   }
   const ice = (state.conn && state.conn.peerConnection) ? (state.conn.peerConnection.iceConnectionState || '?') : '-';
+  const cands = state.debugCandidates && state.debugCandidates.size
+    ? [...state.debugCandidates].join(', ') : 'none yet';
   const lines = [
     `room=${state.roomCode || '-'} user=${state.userName || '-'} peerId=${state.peerId || '-'} role=${state.isHost ? 'HOST' : 'guest'}`,
     `registered=${state.peerRegistered} connected=${state.peerConnected} syncOffline=${state.syncOffline} ice=${ice}`,
+    `cands=${cands}`,
     `peerErr=${state.lastPeerError || '-'} connErr=${state.lastConnError || '-'}`,
     ...state.debugEvents.map((e) => `${e.at} ${e.text}`),
   ];
   el.textContent = 'SYNC DEBUG\n' + lines.join('\n');
+}
+
+// ICE diagnostics: record which kinds of network paths the browser found
+// (host = same network, srflx = via STUN, relay = via TURN) and log every
+// ICE state change. Hooked lazily — the peer connection appears at
+// different moments on host and guest — and re-checked on the 2s refresh.
+function hookIceDiagnostics(conn) {
+  if (!conn || conn._c2tIceHooked) return;
+  const pc = conn.peerConnection;
+  if (!pc) return;
+  conn._c2tIceHooked = true;
+  if (!state.debugCandidates) state.debugCandidates = new Set();
+  pc.addEventListener('icecandidate', (e) => {
+    if (e.candidate && e.candidate.candidate) {
+      const parts = e.candidate.candidate.split(' ');
+      state.debugCandidates.add((parts[7] || '?') + '/' + (parts[2] || '?'));
+      updateDebugPanel();
+    }
+  });
+  pc.addEventListener('iceconnectionstatechange', () => {
+    debugLog('ice state: ' + pc.iceConnectionState);
+  });
 }
 
 function startHeartbeats() {
@@ -2213,7 +2239,10 @@ function enterTheaterUI(code) {
   if (state.debugOn) {
     updateDebugPanel();
     if (state.debugInterval) clearInterval(state.debugInterval);
-    state.debugInterval = setInterval(updateDebugPanel, 2000);
+    state.debugInterval = setInterval(() => {
+      hookIceDiagnostics(state.conn);
+      updateDebugPanel();
+    }, 2000);
   }
 }
 
