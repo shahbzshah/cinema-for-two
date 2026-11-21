@@ -1617,7 +1617,21 @@ function handleIncomingLogLine(line, prevMedia) {
   if (line.type === 'media') {
     handleIncomingMediaUpdate(state.roomData.media, prevMedia);
   } else if (line.type === 'playback') {
-    applyRemotePlaybackState(state.roomData.playback, false);
+    // Apply THIS line, not the merged latest: while this device is playing,
+    // its own 10s heartbeat lines are the freshest in the log, so the merged
+    // playback is our own line — and applying that ignores the partner's
+    // pause/play entirely. The per-sender seq check in
+    // applyRemotePlaybackState guards against stale/out-of-order lines.
+    const d = line.data || {};
+    applyRemotePlaybackState({
+      isPlaying: Boolean(d.isPlaying),
+      currentTime: Number(d.currentTime) || 0,
+      updatedAt: line.at,
+      updatedBy: line.by || '',
+      updatedByName: line.byName || '',
+      actionLabel: d.actionLabel || (d.isPlaying ? 'played' : 'paused'),
+      seq: Number(d.seq) || 0
+    }, false);
   }
 }
 
