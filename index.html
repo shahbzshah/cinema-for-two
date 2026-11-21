@@ -841,20 +841,17 @@
 // =========================================================================
 
 const PEERJS_HOST_PREFIX = 'c2t-';
-// TURN relay (Open Relay Project, free, 20 GB/mo): when a router blocks the
-// direct browser-to-browser link (UDP), the live link goes through this
-// relay over a normal TLS web connection (port 443) instead. Video still
-// streams from YouTube directly — only tiny control messages (play/pause,
-// seek, whispers) go through the relay, so 20 GB/mo is effectively
-// unlimited for two people. Google STUN is kept as well.
+// ICE servers: Google + Cloudflare STUN for direct links, PeerJS's own
+// TURN (its built-in default, which a custom config otherwise discards)
+// as the relay fallback. Open Relay was dropped 22 Nov 2026: its TLS
+// endpoint answers nothing and Metered no longer publishes the free
+// static credentials, so its entries only stalled ICE gathering.
+// PeerJS TURN is a shared, rate-limited public relay — flaky, but the
+// only no-signup relay left; TurnRelay (signup) is the next fallback.
 const ICE_SERVERS = [
   { urls: 'stun:stun.l.google.com:19302' },
-  { urls: 'stun:openrelay.metered.ca:80' },
-  { urls: 'turns:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
-  { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
-  // PeerJS's own TURN servers (its built-in defaults, which a custom
-  // config otherwise discards). They are the fallback if Open Relay's
-  // public credentials are retired — no signup, no account.
+  { urls: 'stun:stun1.l.google.com:19302' },
+  { urls: 'stun:stun.cloudflare.com:3478' },
   { urls: 'turn:eu-0.turn.peerjs.com:3478', username: 'peerjs', credential: 'peerjsp' },
   { urls: 'turn:us-0.turn.peerjs.com:3478', username: 'peerjs', credential: 'peerjsp' },
 ];
@@ -889,6 +886,8 @@ const state = {
   positionSaveInterval: null,
   peerRetryInterval: null,
   peerOpenTimeout: null,
+  peerReconnectTimer: null,
+  connAttemptStartedAt: 0,
   peerRegistered: false,
   syncOffline: false,
   syncOfflineToastShown: false,
@@ -1334,6 +1333,46 @@ function sendPeerMessage(msg) {
   }
 }
 
+function handlePeerSignalingDisconnected() {
+  state.peerRegistered = false;
+  debugLog('peer disconnected from sync server');
+  updateSyncIndicator();
+  if (!state.peer || state.peer.destroyed || state.peerReconnectTimer) return;
+  state.peerReconnectTimer = setTimeout(() => {
+    state.peerReconnectTimer = null;
+    if (state.peer && !state.peer.destroyed && state.peer.disconnected) {
+      debugLog('reconnecting to sync server...');
+      try {
+        state.peer.reconnect();
+      } catch (err) {
+        console.error('Signaling reconnect error:', err);
+      }
+    }
+  }, 2000);
+}
+
+// Guest connect: close any previous attempt BEFORE creating the new one.
+// (The old code did state.conn = next first, which made attachConn's
+// "replace the previous connection" check always false and leaked dead
+// DataConnections.)
+function connectToHost() {
+  if (!state.peer || state.peer.destroyed || state.isHost) return;
+  const hostId = peerHostId(state.roomCode);
+  if (state.conn) {
+    try { state.conn.close(); } catch (_) {}
+    state.conn = null;
+  }
+  state.connAttemptStartedAt = Date.now();
+  debugLog('connecting to host ' + hostId);
+  try {
+    const conn = state.peer.connect(hostId, { reliable: true });
+    if (conn) attachConn(conn);
+  } catch (e) {
+    console.error('Guest connect error:', e);
+    setPeerOffline();
+  }
+}
+
 function setupPeer() {
   cleanupPeer();
   if (typeof Peer === 'undefined') {
@@ -1391,26 +1430,19 @@ function setupPeer() {
         clearTimeout(state.peerOpenTimeout);
         debugLog('guest peer OPEN (' + state.peer.id + ') — connecting to host ' + hostId);
         updateSyncIndicator();
-        try {
-          state.conn = state.peer.connect(hostId, { reliable: true });
-          attachConn(state.conn);
-        } catch (e) {
-          console.error('Guest connect error:', e);
-          setPeerOffline();
-        }
+        connectToHost();
       });
       state.peer.on('error', (e2) => {
         state.lastPeerError = 'guest: ' + (e2 && e2.type ? e2.type : String(e2));
         debugLog('guest peer error: ' + state.lastPeerError);
         console.error('Guest peer error:', e2);
+        if (e2 && e2.type === 'peer-unavailable' && state.conn && !state.peerConnected) {
+          try { state.conn.close(); } catch (_) {}
+          state.conn = null;
+        }
         setPeerOffline();
       });
-      state.peer.on('disconnected', () => {
-        state.peerRegistered = false;
-        debugLog('guest peer disconnected');
-        updateSyncIndicator();
-        setPeerOffline();
-      });
+      state.peer.on('disconnected', handlePeerSignalingDisconnected);
     } else if (err && (err.type === 'peer-unavailable' || err.type === 'network' || err.type === 'server-error' || err.type === 'socket-error' || err.type === 'socket-closed')) {
       state.lastPeerError = err.type;
       debugLog('peer error: ' + err.type);
@@ -1427,12 +1459,7 @@ function setupPeer() {
       console.error('Peer error:', err);
     }
   });
-  state.peer.on('disconnected', () => {
-    state.peerRegistered = false;
-    debugLog('peer disconnected from sync server');
-    updateSyncIndicator();
-    setPeerOffline();
-  });
+  state.peer.on('disconnected', handlePeerSignalingDisconnected);
 }
 
 function attachConn(conn) {
@@ -1440,21 +1467,28 @@ function attachConn(conn) {
   debugLog('connection object with ' + (conn.peer || '?') + ' (offer arrived/sent)');
   hookIceDiagnostics(conn);
   // Only one partner: replace any previous connection — but never kill
-  // one that is still negotiating. ICE can need 15-30s (a slow TURN
-  // allocation over TLS even more); closing it on every new attempt
-  // means no attempt ever finishes, and the panel shows a fresh offer
-  // stuck in "checking" forever.
+  // one that is still negotiating. ICE can need 15s on a slow path; an
+  // attempt stuck in new/checking longer than that is dead, so close it
+  // and let the retry loop try a fresh one. (Unbounded waiting stalled
+  // retries forever; killing every 5s never let one finish.)
   if (state.conn && state.conn !== conn) {
     const prevIce = state.conn.peerConnection && state.conn.peerConnection.iceConnectionState;
-    if (prevIce !== 'new' && prevIce !== 'checking') {
+    const elapsed = Date.now() - (state.connAttemptStartedAt || 0);
+    if ((prevIce !== 'new' && prevIce !== 'checking') || elapsed > 15000) {
       try { state.conn.close(); } catch (_) {}
     }
   }
   state.conn = conn;
   conn.on('open', () => {
+    if (state.conn !== conn) return;
+    hookIceDiagnostics(conn);
     state.peerConnected = true;
     state.lastPongAt = Date.now();
     state.syncOffline = false;
+    if (state.peerRetryInterval) {
+      clearInterval(state.peerRetryInterval);
+      state.peerRetryInterval = null;
+    }
     debugLog('DATA CHANNEL OPEN — connected to partner');
     updatePartnerPresenceUI();
     updateSyncIndicator();
@@ -1464,29 +1498,33 @@ function attachConn(conn) {
     sendPeerMessage({ kind: 'snapshot', from: state.userId, fromName: state.userName, at: Date.now(), media: state.roomData.media, playback: state.roomData.playback });
   });
   conn.on('data', (msg) => {
+    if (state.conn !== conn) return;
     handlePeerMessage(msg);
   });
   conn.on('close', () => {
+    if (state.conn !== conn) return;
+    state.conn = null;
     state.peerConnected = false;
     state.partnerName = '';
     state.partnerUid = '';
     debugLog('data channel closed');
-    updatePartnerPresenceUI();
-    updateSyncIndicator();
+    setPeerOffline();
   });
   conn.on('error', (err) => {
+    if (state.conn !== conn) return;
     state.lastConnError = err && err.type ? err.type : String(err);
     debugLog('data channel error: ' + state.lastConnError);
     console.error('Connection error:', err);
+    state.conn = null;
     state.peerConnected = false;
-    updatePartnerPresenceUI();
-    updateSyncIndicator();
+    setPeerOffline();
   });
 }
 
 function cleanupPeer() {
   if (state.peerRetryInterval) { clearInterval(state.peerRetryInterval); state.peerRetryInterval = null; }
   if (state.peerOpenTimeout) { clearTimeout(state.peerOpenTimeout); state.peerOpenTimeout = null; }
+  if (state.peerReconnectTimer) { clearTimeout(state.peerReconnectTimer); state.peerReconnectTimer = null; }
   if (state.debugInterval) { clearInterval(state.debugInterval); state.debugInterval = null; }
   if (state.presenceHeartbeatInterval) { clearInterval(state.presenceHeartbeatInterval); state.presenceHeartbeatInterval = null; }
   if (state.playerTickInterval) { clearInterval(state.playerTickInterval); state.playerTickInterval = null; }
@@ -1503,6 +1541,7 @@ function cleanupPeer() {
   state.isHost = false;
   state.partnerName = '';
   state.partnerUid = '';
+  state.connAttemptStartedAt = 0;
 }
 
 function setPeerOffline(note) {
@@ -1516,33 +1555,35 @@ function setPeerOffline(note) {
     showToast(note, 'rose');
   }
   // Guest retry: if we are a guest and the host is not there yet, keep
-  // trying every 5s while the theater is open.
+  // trying every 3s while the theater is open. A still-negotiating
+  // attempt gets up to 15s to finish; after that it is dead and a fresh
+  // attempt is tried. (Unbounded waiting stalled retries forever.)
   if (!state.isHost && state.peer && !state.peer.destroyed && !state.peerRetryInterval) {
     state.peerRetryInterval = setInterval(() => {
-      if (state.peerConnected || !state.peer || state.peer.destroyed) {
+      if (state.peerConnected || !state.peer || state.peer.destroyed || state.isHost) {
         clearInterval(state.peerRetryInterval);
         state.peerRetryInterval = null;
         return;
       }
-      // Let a still-negotiating attempt finish: ICE can need 15-30s and
-      // a slow TURN allocation over TLS even more. Spawning a fresh
-      // connection every 5s kills each attempt before it can complete.
+      if (state.peer.disconnected) {
+        handlePeerSignalingDisconnected();
+        return;
+      }
+      // Let a still-negotiating attempt finish: ICE can need 15s on a
+      // slow path. Spawning a fresh connection every few seconds kills
+      // each attempt before it can complete.
       const cur = state.conn;
       if (cur && cur.peerConnection) {
+        hookIceDiagnostics(cur);
         const ice = cur.peerConnection.iceConnectionState;
-        if (ice === 'new' || ice === 'checking') {
-          debugLog('retry: previous attempt still ' + ice + ' — waiting');
+        const elapsed = Date.now() - (state.connAttemptStartedAt || 0);
+        if ((ice === 'new' || ice === 'checking') && elapsed < 15000) {
+          debugLog('retry: previous attempt still ' + ice + ' (' + Math.round(elapsed / 1000) + 's) — waiting');
           return;
         }
       }
-      try {
-        const next = state.peer.connect(peerHostId(state.roomCode), { reliable: true });
-        if (next) {
-          state.conn = next;
-          attachConn(next);
-        }
-      } catch (_) {}
-    }, 5000);
+      connectToHost();
+    }, 3000);
   }
 }
 
@@ -1791,7 +1832,16 @@ function hookIceDiagnostics(conn) {
     }
   });
   pc.addEventListener('iceconnectionstatechange', () => {
-    debugLog('ice state: ' + pc.iceConnectionState);
+    const ice = pc.iceConnectionState;
+    debugLog('ice state: ' + ice);
+    if ((ice === 'failed' || ice === 'closed') && state.conn === conn) {
+      try { conn.close(); } catch (_) {}
+      state.conn = null;
+      state.peerConnected = false;
+      state.partnerName = '';
+      state.partnerUid = '';
+      setPeerOffline();
+    }
   });
 }
 
@@ -1810,6 +1860,19 @@ function startHeartbeats() {
 
   state.presenceHeartbeatInterval = setInterval(() => {
     if (state.peerConnected) {
+      // Silent partner (tab closed, network gone): no pong for 45s means
+      // the channel is dead even though it never fired close/error.
+      // Tear it down so the guest retry loop can reconnect.
+      if (Date.now() - state.lastPongAt > 45000) {
+        debugLog('partner pong timeout — resetting connection');
+        try { state.conn?.close(); } catch (_) {}
+        state.conn = null;
+        state.peerConnected = false;
+        state.partnerName = '';
+        state.partnerUid = '';
+        setPeerOffline();
+        return;
+      }
       sendPeerMessage({ kind: 'ping', from: state.userId, fromName: state.userName, at: Date.now() });
       updatePartnerPresenceUI();
     }
@@ -2237,6 +2300,13 @@ function switchSourceTab(tabKey) {
 // =========================================================================
 function enterTheaterUI(code) {
   state.roomCode = code;
+  // Fresh room, fresh sync cursors — stale ones from the previous room
+  // would drop or mis-apply the new room's first messages.
+  state.lastMountedMediaKey = '';
+  state.lastProcessedSeq = 0;
+  state.lastSeqBySender = {};
+  state.lastWhisperCount = 0;
+  state.lastPongAt = 0;
   window.location.hash = `room=${code}`;
   dom.roomCodeBadge.textContent = code;
   dom.headerUserName.textContent = state.userName;
