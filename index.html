@@ -233,7 +233,7 @@
           Private Velvet Screening Room
         </div>
         <h1 class="font-serif text-3xl sm:text-4xl font-bold text-white tracking-tight">
-          Cinema <span class="text-amber-400 italic font-normal">for</span> Two
+          Cinema <span class="text-amber-400 italic font-normal">for</span> Two <span class="align-middle px-2 py-0.5 rounded-md bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs font-bold tracking-wider">v2</span>
         </h1>
         <p class="text-gray-400 text-sm sm:text-base mt-2 max-w-sm mx-auto leading-relaxed">
           Sync movies across miles, share live reactions, and stamp every date night into your shared passport.
@@ -323,7 +323,53 @@
   <!-- =====================================================================
        VIEW 2: SCREENING ROOM (ACTIVE WATCH PARTY)
   ====================================================================== -->
+
+  <!-- v2: Pre-Show Face-to-Face Lounge — meet before the movie starts -->
+  <div id="loungeView" class="hidden min-h-screen flex flex-col items-center justify-center p-4 sm:p-6">
+    <div class="w-full max-w-3xl text-center">
+      <p class="text-xs font-semibold uppercase tracking-wider text-amber-300/90 mb-2">Pre-Show Lounge</p>
+      <h2 class="font-serif text-2xl sm:text-3xl font-bold text-white tracking-tight mb-2">Face to face before the film</h2>
+      <p id="loungeStatus" class="text-sm text-gray-400 mb-6">Waiting for your partner to join the room…</p>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+        <div class="rounded-2xl overflow-hidden bg-black border border-white/10 aspect-video relative">
+          <video id="loungeLocalVideo" autoplay muted playsinline class="w-full h-full object-cover"></video>
+          <span id="loungeLocalName" class="absolute bottom-2 left-2 px-2 py-1 rounded-lg bg-black/60 text-xs text-white">You</span>
+        </div>
+        <div class="rounded-2xl overflow-hidden bg-black border border-white/10 aspect-video relative">
+          <video id="loungePartnerVideo" autoplay playsinline class="w-full h-full object-cover"></video>
+          <span id="loungePartnerName" class="absolute bottom-2 left-2 px-2 py-1 rounded-lg bg-black/60 text-xs text-white">Partner</span>
+        </div>
+      </div>
+      <div class="flex flex-wrap items-center justify-center gap-2 mb-4">
+        <button id="loungeCamBtn" type="button" class="px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-gray-200 font-semibold text-xs transition cursor-pointer">Camera off</button>
+        <button id="loungeMicBtn" type="button" class="px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-gray-200 font-semibold text-xs transition cursor-pointer">Mic on</button>
+      </div>
+      <button id="loungeStartBtn" type="button" class="px-6 py-3 rounded-2xl bg-amber-500 hover:bg-amber-400 text-obsidian font-bold text-sm transition cursor-pointer">Start watching together</button>
+      <div class="mt-3">
+        <button id="loungeNoVideoBtn" type="button" class="text-xs text-gray-400 hover:text-gray-200 underline underline-offset-2 cursor-pointer">Skip video — watch without camera</button>
+      </div>
+    </div>
+  </div>
   <div id="theaterView" class="hidden min-h-screen flex flex-col pb-12">
+
+    <!-- v2: Floating Picture-in-Picture — drag it anywhere, or tap Corner to cycle corners -->
+    <div id="callPip" class="hidden fixed z-50 w-56 sm:w-64 rounded-2xl overflow-hidden bg-black border border-amber-500/40 shadow-2xl" style="right:12px;bottom:12px;touch-action:none;">
+      <div class="flex items-center justify-between px-2.5 py-1.5 bg-black/70 cursor-grab active:cursor-grabbing select-none">
+        <span id="pipPartnerName" class="text-xs font-semibold text-amber-200 truncate">Partner</span>
+        <span class="text-[10px] text-gray-400">drag me</span>
+      </div>
+      <div class="relative aspect-video bg-black">
+        <video id="pipPartnerVideo" autoplay playsinline class="w-full h-full object-cover"></video>
+        <video id="pipLocalVideo" autoplay muted playsinline class="absolute bottom-1.5 right-1.5 w-16 sm:w-20 aspect-video object-cover rounded-lg border border-white/30 bg-black"></video>
+      </div>
+      <div class="flex items-center justify-center gap-1 px-2 py-1.5 bg-black/70">
+        <button id="pipMicBtn" type="button" class="px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-gray-200 text-[11px] font-semibold cursor-pointer">Mic</button>
+        <button id="pipCamBtn" type="button" class="px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-gray-200 text-[11px] font-semibold cursor-pointer">Cam</button>
+        <button id="pipCornerBtn" type="button" class="px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-gray-200 text-[11px] font-semibold cursor-pointer">Corner</button>
+        <button id="pipHideBtn" type="button" class="px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-gray-200 text-[11px] font-semibold cursor-pointer">Hide</button>
+        <button id="pipEndBtn" type="button" class="px-2 py-1 rounded-lg bg-rose-500/80 hover:bg-rose-500 text-white text-[11px] font-semibold cursor-pointer">End</button>
+      </div>
+    </div>
 
     <!-- Top Navigation Header -->
     <header class="sticky top-0 z-40 glass-card border-x-0 border-t-0 rounded-none px-3 sm:px-6 py-3">
@@ -335,7 +381,7 @@
           </button>
           <div>
             <div class="flex items-center gap-2">
-              <span class="font-serif text-lg sm:text-xl font-bold text-white tracking-tight">Cinema <span class="text-amber-400 italic font-normal">for</span> Two</span>
+              <span class="font-serif text-lg sm:text-xl font-bold text-white tracking-tight">Cinema <span class="text-amber-400 italic font-normal">for</span> Two</span> <span class="px-1.5 py-0.5 rounded-md bg-amber-500/15 border border-amber-500/30 text-amber-300 text-[10px] font-bold tracking-wider">v2</span>
             </div>
             <p class="text-[11px] text-gray-400 hidden sm:block">Signed in as <span id="headerUserName" class="text-amber-300 font-medium">You</span></p>
           </div>
@@ -348,6 +394,7 @@
             <span id="presenceDot" class="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse"></span>
             <span id="presenceText">Waiting for partner to join...</span>
           </div>
+          <button id="showFacesBtn" type="button" class="hidden px-3 py-1.5 rounded-full bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-200 text-xs font-medium transition cursor-pointer">Show faces</button>
 
           <!-- Room Code + Copy Invite Button -->
           <div class="flex items-center bg-black/50 border border-white/10 rounded-full p-1 pl-3">
@@ -841,6 +888,7 @@
 // =========================================================================
 
 const PEERJS_HOST_PREFIX = 'c2t-';
+const APP_VERSION = '2.0.0'; // v2: voice & video calling, lounge, floating PiP
 // ICE servers: Google + Cloudflare STUN for direct links, PeerJS's own
 // TURN (its built-in default, which a custom config otherwise discards)
 // as the relay fallback. Open Relay was dropped 22 Nov 2026: its TLS
@@ -905,6 +953,15 @@ const state = {
   partnerUid: '',
   lastPongAt: 0,
   lastRemoteApplied: null, // last playback state applied FROM the partner — echoes of it are swallowed, not rebroadcast
+  // v2 — voice & video calling (WebRTC media over the same PeerJS link)
+  localStream: null,
+  remoteStream: null,
+  mediaConn: null,
+  camOn: false,
+  micOn: true,
+  inLounge: false,
+  pipCornerIdx: 0, // 0 bottom-right, 1 bottom-left, 2 top-right, 3 top-left
+  pipVisible: false,
   logLines: [], // parsed JSONL log objects, in order
   pendingImportLines: [], // .jsonl lines loaded on the welcome screen, applied on room entry
   readyCheck: { active: false, startedBy: '', startedByUid: '', readyUsers: {}, countdownStartAt: null }
@@ -925,6 +982,26 @@ const dom = {
   welcomeImportInput: document.getElementById('welcomeImportInput'),
   welcomeImportStatus: document.getElementById('welcomeImportStatus'),
   leaveRoomBtn: document.getElementById('leaveRoomBtn'),
+  loungeView: document.getElementById('loungeView'),
+  loungeLocalVideo: document.getElementById('loungeLocalVideo'),
+  loungePartnerVideo: document.getElementById('loungePartnerVideo'),
+  loungeLocalName: document.getElementById('loungeLocalName'),
+  loungePartnerName: document.getElementById('loungePartnerName'),
+  loungeStatus: document.getElementById('loungeStatus'),
+  loungeCamBtn: document.getElementById('loungeCamBtn'),
+  loungeMicBtn: document.getElementById('loungeMicBtn'),
+  loungeStartBtn: document.getElementById('loungeStartBtn'),
+  loungeNoVideoBtn: document.getElementById('loungeNoVideoBtn'),
+  callPip: document.getElementById('callPip'),
+  pipPartnerVideo: document.getElementById('pipPartnerVideo'),
+  pipLocalVideo: document.getElementById('pipLocalVideo'),
+  pipPartnerName: document.getElementById('pipPartnerName'),
+  pipMicBtn: document.getElementById('pipMicBtn'),
+  pipCamBtn: document.getElementById('pipCamBtn'),
+  pipCornerBtn: document.getElementById('pipCornerBtn'),
+  pipHideBtn: document.getElementById('pipHideBtn'),
+  pipEndBtn: document.getElementById('pipEndBtn'),
+  showFacesBtn: document.getElementById('showFacesBtn'),
   headerUserName: document.getElementById('headerUserName'),
   presenceBadge: document.getElementById('presenceBadge'),
   presenceDot: document.getElementById('presenceDot'),
@@ -1417,6 +1494,7 @@ function setupPeer() {
   state.peer.on('connection', (conn) => {
     attachConn(conn);
   });
+  state.peer.on('call', answerMediaCall);
   state.peer.on('error', (err) => {
     if (err && err.type === 'unavailable-id') {
       // The room is already hosted (partner is here) — join as a guest.
@@ -1443,6 +1521,7 @@ function setupPeer() {
         }
         setPeerOffline();
       });
+      state.peer.on('call', answerMediaCall);
       state.peer.on('disconnected', handlePeerSignalingDisconnected);
     } else if (err && (err.type === 'peer-unavailable' || err.type === 'network' || err.type === 'server-error' || err.type === 'socket-error' || err.type === 'socket-closed')) {
       state.lastPeerError = err.type;
@@ -1497,6 +1576,19 @@ function attachConn(conn) {
     sendPeerMessage({ kind: 'hello', from: state.userId, fromName: state.userName, at: Date.now() });
     sendPeerMessage({ kind: 'log-lines', from: state.userId, fromName: state.userName, at: Date.now(), lines: state.logLines });
     sendPeerMessage({ kind: 'snapshot', from: state.userId, fromName: state.userName, at: Date.now(), media: state.roomData.media, playback: state.roomData.playback });
+    updateLoungeStatus();
+    // Voice & video: the host calls the guest (it knows the guest id from
+    // conn.peer) when the host has a camera. The guest calls back after 3s
+    // if no call arrived and it has a camera (the host has none).
+    if (state.isHost) {
+      if (state.localStream) startMediaCallTo(conn.peer);
+    } else if (state.localStream) {
+      setTimeout(() => {
+        if (!state.mediaConn && state.peerConnected && !state.isHost && state.localStream) {
+          startMediaCallTo(peerHostId(state.roomCode));
+        }
+      }, 3000);
+    }
   });
   conn.on('data', (msg) => {
     if (state.conn !== conn) return;
@@ -1533,6 +1625,12 @@ function cleanupPeer() {
   if (state.countdownInterval) { clearInterval(state.countdownInterval); state.countdownInterval = null; }
   try { if (state.conn) state.conn.close(); } catch (_) {}
   try { if (state.peer) state.peer.destroy(); } catch (_) {}
+  if (state.mediaConn) { try { state.mediaConn.close(); } catch (_) {} state.mediaConn = null; }
+  if (state.remoteStream) {
+    state.remoteStream = null;
+    if (dom.loungePartnerVideo) dom.loungePartnerVideo.srcObject = null;
+    if (dom.pipPartnerVideo) dom.pipPartnerVideo.srcObject = null;
+  }
   state.conn = null;
   state.peer = null;
   state.peerConnected = false;
@@ -1586,6 +1684,251 @@ function setPeerOffline(note) {
       connectToHost();
     }, 3000);
   }
+}
+
+// =========================================================================
+// 4b. VOICE & VIDEO CALLING (v2) — WebRTC media over the same PeerJS link.
+// No second signalling server: the media call rides the PeerJS peer and
+// ICE servers that already connect the two browsers. One MediaConnection
+// only: the HOST calls the guest when the data channel opens (if the host
+// has a camera); the GUEST calls back after 3s if no call arrived (it has
+// a camera and the host does not). Either side may answer without a
+// stream (receive-only) — camera is opt-in, never forced.
+// =========================================================================
+const PIP_CORNERS = ['bottom-right', 'bottom-left', 'top-right', 'top-left'];
+
+function nextPipCorner(i) {
+  return ((i || 0) + 1) % PIP_CORNERS.length;
+}
+
+function updateCallButtons() {
+  const camLabel = state.camOn ? 'Camera on' : 'Camera off';
+  const micLabel = state.micOn ? 'Mic on' : 'Muted';
+  if (dom.loungeCamBtn) dom.loungeCamBtn.textContent = camLabel;
+  if (dom.loungeMicBtn) dom.loungeMicBtn.textContent = micLabel;
+  if (dom.pipCamBtn) dom.pipCamBtn.textContent = state.camOn ? 'Cam' : 'Cam off';
+  if (dom.pipMicBtn) dom.pipMicBtn.textContent = state.micOn ? 'Mic' : 'Muted';
+}
+
+function attachRemoteStream(stream) {
+  state.remoteStream = stream || null;
+  if (dom.loungePartnerVideo) dom.loungePartnerVideo.srcObject = stream || null;
+  if (dom.pipPartnerVideo) dom.pipPartnerVideo.srcObject = stream || null;
+  if (stream && !state.inLounge) showPip(true);
+  updateLoungeStatus();
+}
+
+function wireMediaConn(call) {
+  if (!call) return;
+  state.mediaConn = call;
+  call.on('stream', (stream) => {
+    debugLog('call stream received');
+    attachRemoteStream(stream);
+  });
+  call.on('close', () => {
+    if (state.mediaConn !== call) return;
+    state.mediaConn = null;
+    debugLog('call closed');
+    attachRemoteStream(null);
+  });
+  call.on('error', (err) => {
+    console.error('Call error:', err);
+    if (state.mediaConn !== call) return;
+    state.mediaConn = null;
+    attachRemoteStream(null);
+  });
+}
+
+function answerMediaCall(call) {
+  if (!call) return;
+  debugLog('incoming call — answering' + (state.localStream ? ' with camera' : ' (receive-only)'));
+  try {
+    if (state.localStream) call.answer(state.localStream);
+    else call.answer();
+  } catch (e) {
+    console.error('Answer call error:', e);
+    return;
+  }
+  wireMediaConn(call);
+}
+
+function startMediaCallTo(peerId) {
+  if (!state.peer || state.peer.destroyed || state.mediaConn || !peerId) return;
+  debugLog('calling ' + peerId);
+  try {
+    const call = state.peer.call(peerId, state.localStream);
+    if (call) wireMediaConn(call);
+  } catch (e) {
+    console.error('Call error:', e);
+  }
+}
+
+function endMediaCall() {
+  if (state.mediaConn) {
+    try { state.mediaConn.close(); } catch (_) {}
+    state.mediaConn = null;
+  }
+  attachRemoteStream(null);
+  showPip(false);
+}
+
+async function startLocalCamera() {
+  if (state.localStream) return true;
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    showToast('This browser cannot open the camera — you can still watch without video.', 'rose');
+    return false;
+  }
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { width: { ideal: 640 }, height: { ideal: 360 }, facingMode: 'user' },
+      audio: { echoCancellation: true, noiseSuppression: true },
+    });
+    state.localStream = stream;
+    state.camOn = true;
+    state.micOn = true;
+    if (dom.loungeLocalVideo) dom.loungeLocalVideo.srcObject = stream;
+    if (dom.pipLocalVideo) dom.pipLocalVideo.srcObject = stream;
+    updateCallButtons();
+    return true;
+  } catch (e) {
+    console.error('Camera error:', e);
+    showToast('Camera is off — check the browser permission and try again. You can still watch without video.', 'rose');
+    return false;
+  }
+}
+
+function stopLocalCamera() {
+  if (state.localStream) {
+    try { state.localStream.getTracks().forEach((t) => t.stop()); } catch (_) {}
+    state.localStream = null;
+  }
+  state.camOn = false;
+  if (dom.loungeLocalVideo) dom.loungeLocalVideo.srcObject = null;
+  if (dom.pipLocalVideo) dom.pipLocalVideo.srcObject = null;
+  updateCallButtons();
+}
+
+function setMicOn(on) {
+  state.micOn = !!on;
+  if (state.localStream) {
+    state.localStream.getAudioTracks().forEach((t) => { t.enabled = state.micOn; });
+  }
+  updateCallButtons();
+}
+
+function setCamOn(on) {
+  if (on && !state.localStream) {
+    startLocalCamera();
+    return;
+  }
+  state.camOn = !!on;
+  if (state.localStream) {
+    state.localStream.getVideoTracks().forEach((t) => { t.enabled = state.camOn; });
+  }
+  updateCallButtons();
+}
+
+// --- Pre-Show Face-to-Face Lounge ---------------------------------------
+function updateLoungeStatus() {
+  if (!dom.loungeStatus) return;
+  if (state.peerConnected && state.remoteStream) {
+    dom.loungeStatus.textContent = 'Your partner is here — say hi, then start the movie together.';
+  } else if (state.peerConnected) {
+    dom.loungeStatus.textContent = 'Your partner is here (no video yet) — start whenever you are ready.';
+  } else {
+    dom.loungeStatus.textContent = 'Waiting for your partner to join the room…';
+  }
+  if (dom.loungePartnerName) {
+    dom.loungePartnerName.textContent = state.partnerName || 'Partner';
+  }
+  if (dom.loungeLocalName) {
+    dom.loungeLocalName.textContent = (state.userName || 'You') + ' (you)';
+  }
+  if (dom.pipPartnerName) {
+    dom.pipPartnerName.textContent = state.partnerName || 'Partner';
+  }
+}
+
+function enterLounge() {
+  state.inLounge = true;
+  if (dom.loungeView) dom.loungeView.classList.remove('hidden');
+  if (dom.theaterView) dom.theaterView.classList.add('hidden');
+  updateLoungeStatus();
+  updateCallButtons();
+}
+
+function exitLoungeToTheater() {
+  state.inLounge = false;
+  if (dom.loungeView) dom.loungeView.classList.add('hidden');
+  if (dom.theaterView) dom.theaterView.classList.remove('hidden');
+  if (state.remoteStream || state.localStream) showPip(true);
+}
+
+// --- Floating Picture-in-Picture overlay ---------------------------------
+function setPipCorner(idx) {
+  state.pipCornerIdx = ((idx || 0) + PIP_CORNERS.length) % PIP_CORNERS.length;
+  const el = dom.callPip;
+  if (!el) return;
+  el.style.left = '';
+  el.style.top = '';
+  el.style.right = '';
+  el.style.bottom = '';
+  const corner = PIP_CORNERS[state.pipCornerIdx];
+  if (corner.indexOf('right') !== -1) el.style.right = '12px';
+  else el.style.left = '12px';
+  if (corner.indexOf('bottom') !== -1) el.style.bottom = '12px';
+  else el.style.top = '76px';
+}
+
+function showPip(show) {
+  state.pipVisible = !!show;
+  if (dom.callPip) dom.callPip.classList.toggle('hidden', !state.pipVisible);
+  // "Show faces" button appears only while a call exists and the PiP is hidden.
+  if (dom.showFacesBtn) {
+    const showBtn = !state.pipVisible && !!(state.remoteStream || state.localStream);
+    dom.showFacesBtn.classList.toggle('hidden', !showBtn);
+  }
+  if (state.pipVisible) setPipCorner(state.pipCornerIdx);
+}
+
+// Drag the PiP anywhere; on release it snaps to the nearest corner.
+let pipDrag = null;
+function pipDragStart(e) {
+  const el = dom.callPip;
+  if (!el || e.target.closest('button')) return;
+  const rect = el.getBoundingClientRect();
+  pipDrag = {
+    dx: (e.clientX ?? 0) - rect.left,
+    dy: (e.clientY ?? 0) - rect.top,
+    w: rect.width,
+    h: rect.height,
+  };
+  el.style.right = '';
+  el.style.bottom = '';
+  el.style.left = rect.left + 'px';
+  el.style.top = rect.top + 'px';
+  if (e.target.setPointerCapture) {
+    try { e.target.setPointerCapture(e.pointerId); } catch (_) {}
+  }
+  e.preventDefault();
+}
+function pipDragMove(e) {
+  if (!pipDrag || !dom.callPip) return;
+  const x = Math.max(0, Math.min(window.innerWidth - pipDrag.w, (e.clientX ?? 0) - pipDrag.dx));
+  const y = Math.max(0, Math.min(window.innerHeight - pipDrag.h, (e.clientY ?? 0) - pipDrag.dy));
+  dom.callPip.style.left = x + 'px';
+  dom.callPip.style.top = y + 'px';
+}
+function pipDragEnd() {
+  if (!pipDrag || !dom.callPip) return;
+  const rect = dom.callPip.getBoundingClientRect();
+  const cx = rect.left + rect.width / 2;
+  const cy = rect.top + rect.height / 2;
+  const right = cx > window.innerWidth / 2;
+  const bottom = cy > window.innerHeight / 2;
+  state.pipCornerIdx = (bottom ? 0 : 2) + (right ? 0 : 1);
+  pipDrag = null;
+  setPipCorner(state.pipCornerIdx);
 }
 
 // =========================================================================
@@ -1809,6 +2152,7 @@ function updateDebugPanel() {
     `room=${state.roomCode || '-'} user=${state.userName || '-'} peerId=${state.peerId || '-'} role=${state.isHost ? 'HOST' : 'guest'}`,
     `registered=${state.peerRegistered} connected=${state.peerConnected} syncOffline=${state.syncOffline} ice=${ice}`,
     `cands=${cands}`,
+    `call=${state.mediaConn ? (state.remoteStream ? 'live' : 'calling') : 'off'} cam=${state.camOn ? 'on' : 'off'} mic=${state.micOn ? 'on' : 'off'} lounge=${state.inLounge}`,
     `peerErr=${state.lastPeerError || '-'} connErr=${state.lastConnError || '-'}`,
     ...state.debugEvents.map((e) => `${e.at} ${e.text}`),
   ];
@@ -2337,7 +2681,11 @@ function enterTheaterUI(code) {
   dom.headerUserName.textContent = state.userName;
 
   dom.welcomeView.classList.add('hidden');
-  dom.theaterView.classList.remove('hidden');
+  dom.theaterView.classList.add('hidden');
+
+  // v2: land in the Pre-Show Lounge first — face to face — then tap
+  // "Start watching" to enter the theater (video becomes the PiP).
+  enterLounge();
 
   // Replay this room's memories instantly — the screen is never empty.
   loadLog();
@@ -2968,11 +3316,43 @@ dom.joinRoomBtn.addEventListener('click', handleJoinRoom);
 
 dom.leaveRoomBtn.addEventListener('click', () => {
   saveFinalPosition();
+  endMediaCall();
+  stopLocalCamera();
+  state.inLounge = false;
   cleanupPeer();
   executeLocalPause();
+  if (dom.loungeView) dom.loungeView.classList.add('hidden');
   dom.theaterView.classList.add('hidden');
   dom.welcomeView.classList.remove('hidden');
 });
+
+// v2 — Pre-Show Lounge + floating PiP controls.
+dom.loungeCamBtn.addEventListener('click', () => {
+  if (state.camOn) {
+    setCamOn(false);
+  } else {
+    startLocalCamera().then((ok) => {
+      if (ok && state.peerConnected && !state.mediaConn) {
+        // Camera just came on: (re)start the call to the partner.
+        if (state.isHost && state.conn) startMediaCallTo(state.conn.peer);
+        else startMediaCallTo(peerHostId(state.roomCode));
+      }
+    });
+  }
+});
+dom.loungeMicBtn.addEventListener('click', () => setMicOn(!state.micOn));
+dom.loungeStartBtn.addEventListener('click', exitLoungeToTheater);
+dom.loungeNoVideoBtn.addEventListener('click', exitLoungeToTheater);
+dom.pipMicBtn.addEventListener('click', () => setMicOn(!state.micOn));
+dom.pipCamBtn.addEventListener('click', () => setCamOn(!state.camOn));
+dom.pipCornerBtn.addEventListener('click', () => setPipCorner(nextPipCorner(state.pipCornerIdx)));
+dom.pipHideBtn.addEventListener('click', () => showPip(false));
+dom.pipEndBtn.addEventListener('click', () => endMediaCall());
+dom.showFacesBtn.addEventListener('click', () => showPip(true));
+dom.callPip.addEventListener('pointerdown', pipDragStart);
+dom.callPip.addEventListener('pointermove', pipDragMove);
+dom.callPip.addEventListener('pointerup', pipDragEnd);
+dom.callPip.addEventListener('pointercancel', pipDragEnd);
 
 dom.copyInviteBtn.addEventListener('click', () => {
   const shareUrl = `${window.location.origin}${window.location.pathname}#room=${state.roomCode}`;
