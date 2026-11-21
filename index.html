@@ -852,6 +852,11 @@ const ICE_SERVERS = [
   { urls: 'stun:openrelay.metered.ca:80' },
   { urls: 'turns:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
   { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
+  // PeerJS's own TURN servers (its built-in defaults, which a custom
+  // config otherwise discards). They are the fallback if Open Relay's
+  // public credentials are retired — no signup, no account.
+  { urls: 'turn:eu-0.turn.peerjs.com:3478', username: 'peerjs', credential: 'peerjsp' },
+  { urls: 'turn:us-0.turn.peerjs.com:3478', username: 'peerjs', credential: 'peerjsp' },
 ];
 const LOG_VERSION = 1;
 
@@ -1434,9 +1439,16 @@ function attachConn(conn) {
   if (!conn) return;
   debugLog('connection object with ' + (conn.peer || '?') + ' (offer arrived/sent)');
   hookIceDiagnostics(conn);
-  // Only one partner: replace any previous connection.
+  // Only one partner: replace any previous connection — but never kill
+  // one that is still negotiating. ICE can need 15-30s (a slow TURN
+  // allocation over TLS even more); closing it on every new attempt
+  // means no attempt ever finishes, and the panel shows a fresh offer
+  // stuck in "checking" forever.
   if (state.conn && state.conn !== conn) {
-    try { state.conn.close(); } catch (_) {}
+    const prevIce = state.conn.peerConnection && state.conn.peerConnection.iceConnectionState;
+    if (prevIce !== 'new' && prevIce !== 'checking') {
+      try { state.conn.close(); } catch (_) {}
+    }
   }
   state.conn = conn;
   conn.on('open', () => {
@@ -1512,9 +1524,23 @@ function setPeerOffline(note) {
         state.peerRetryInterval = null;
         return;
       }
+      // Let a still-negotiating attempt finish: ICE can need 15-30s and
+      // a slow TURN allocation over TLS even more. Spawning a fresh
+      // connection every 5s kills each attempt before it can complete.
+      const cur = state.conn;
+      if (cur && cur.peerConnection) {
+        const ice = cur.peerConnection.iceConnectionState;
+        if (ice === 'new' || ice === 'checking') {
+          debugLog('retry: previous attempt still ' + ice + ' — waiting');
+          return;
+        }
+      }
       try {
-        state.conn = state.peer.connect(peerHostId(state.roomCode), { reliable: true });
-        attachConn(state.conn);
+        const next = state.peer.connect(peerHostId(state.roomCode), { reliable: true });
+        if (next) {
+          state.conn = next;
+          attachConn(next);
+        }
       } catch (_) {}
     }, 5000);
   }
