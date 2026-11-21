@@ -1079,7 +1079,7 @@ const dom = {
 // =========================================================================
 // 2. UTILITY HELPERS (TOASTS, CLIPBOARD, TIME FORMATTING, YOUTUBE PARSER)
 // =========================================================================
-function showToast(message, variant = 'gold') {
+function showToast(message, variant = 'gold', onClick = null, durationMs = 3200) {
   const el = document.createElement('div');
   const borderClass =
     variant === 'rose'
@@ -1090,6 +1090,13 @@ function showToast(message, variant = 'gold') {
 
   el.className = `pointer-events-auto px-4 py-2.5 rounded-full border ${borderClass} backdrop-blur-md shadow-xl text-xs sm:text-sm font-medium flex items-center gap-2 transition-all duration-300 transform -translate-y-2 opacity-0`;
   el.textContent = message;
+  if (onClick) {
+    el.style.cursor = 'pointer';
+    el.addEventListener('click', () => {
+      try { onClick(); } catch (_) {}
+      el.remove();
+    });
+  }
   dom.toastContainer.appendChild(el);
 
   requestAnimationFrame(() => {
@@ -1099,7 +1106,7 @@ function showToast(message, variant = 'gold') {
   setTimeout(() => {
     el.classList.add('-translate-y-2', 'opacity-0');
     setTimeout(() => el.remove(), 300);
-  }, 3200);
+  }, durationMs);
 }
 
 function copyTextSafely(text) {
@@ -2068,6 +2075,20 @@ function handleIncomingLogLine(line, prevMedia) {
       actionLabel: d.actionLabel || (d.isPlaying ? 'played' : 'paused'),
       seq: Number(d.seq) || 0
     }, false);
+  } else if (line.type === 'whisper') {
+    // A whisper just arrived live from the partner: pop a notification
+    // so it isn't missed while watching (the unread badge alone is easy
+    // to overlook). Tapping it opens the chat. Only when the drawer is
+    // closed — if it's open the message is already on screen. Own lines
+    // never arrive here, but guard anyway. Bulk catch-up (log-lines)
+    // doesn't pass through here, so reconnects don't spam popups.
+    if (line.by && line.by !== state.userId && !state.isWhisperOpen) {
+      const d = line.data || {};
+      const name = d.senderName || line.byName || 'Your partner';
+      const text = String(d.text || '');
+      const preview = text.length > 60 ? text.slice(0, 60) + '…' : text;
+      showToast(`💬 ${name}: ${preview}`, 'rose', () => setWhisperOpen(true), 5000);
+    }
   }
 }
 
@@ -3546,13 +3567,16 @@ dom.thinkingOfYouBtn.addEventListener('click', () => {
 });
 
 // Whisper Chat
-dom.toggleWhisperBtn.addEventListener('click', () => {
-  state.isWhisperOpen = !state.isWhisperOpen;
+function setWhisperOpen(open) {
+  state.isWhisperOpen = open;
   dom.whisperDrawerBody.classList.toggle('hidden', !state.isWhisperOpen);
   dom.whisperChevron.style.transform = state.isWhisperOpen ? 'rotate(0deg)' : 'rotate(-90deg)';
   if (state.isWhisperOpen) {
     dom.whisperUnreadBadge.classList.add('hidden');
   }
+}
+dom.toggleWhisperBtn.addEventListener('click', () => {
+  setWhisperOpen(!state.isWhisperOpen);
 });
 
 dom.whisperForm.addEventListener('submit', (e) => {
