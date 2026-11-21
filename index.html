@@ -1,0 +1,2844 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Cinema for Two — Private Screening Room</title>
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- PeerJS 1.5.4: browser-to-browser live sync, no backend -->
+  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+
+  <!-- Google Fonts: Playfair Display, Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:ital,wght@0,600;0,700;1,500&display=swap" rel="stylesheet" />
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            serif: ['Playfair Display', 'serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            obsidian: '#0a0c12',
+            velvet: '#121622',
+            gold: {
+              400: '#fbbf24',
+              500: '#f59e0b',
+              600: '#d97706',
+            },
+            rose: {
+              400: '#fb7185',
+              500: '#f43f5e',
+              600: '#e11d48',
+            }
+          }
+        }
+      }
+    };
+  </script>
+
+  <style>
+    :root {
+      --bg-obsidian: #0a0c12;
+      --accent-gold: #f59e0b;
+      --accent-rose: #f43f5e;
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      background-color: var(--bg-obsidian);
+      color: #f3f4f6;
+      font-family: 'Inter', sans-serif;
+      overflow-x: hidden;
+      min-height: 100vh;
+      background-image:
+        radial-gradient(circle at 18% 12%, rgba(245, 158, 11, 0.08), transparent 42%),
+        radial-gradient(circle at 85% 25%, rgba(244, 63, 94, 0.08), transparent 45%),
+        radial-gradient(circle at 50% 90%, rgba(245, 158, 11, 0.05), transparent 50%);
+    }
+
+    /* Glassmorphism Velvet Cards */
+    .glass-card {
+      background: rgba(17, 21, 33, 0.78);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      border: 1px solid rgba(245, 158, 11, 0.16);
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    }
+
+    .glass-subtle {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    /* Ambient Cinema Screen Glow */
+    .cinema-stage-wrapper {
+      position: relative;
+    }
+    .cinema-ambient-glow {
+      position: absolute;
+      inset: -14px;
+      border-radius: 28px;
+      background: linear-gradient(125deg, rgba(245, 158, 11, 0.24), rgba(244, 63, 94, 0.18), rgba(245, 158, 11, 0.22));
+      filter: blur(28px);
+      opacity: 0.65;
+      z-index: 0;
+      transition: opacity 0.6s ease, transform 0.6s ease;
+      pointer-events: none;
+    }
+    .cinema-ambient-glow.is-playing {
+      opacity: 0.95;
+      animation: ambientPulse 6s ease-in-out infinite alternate;
+    }
+    .cinema-ambient-glow.love-pulse {
+      background: linear-gradient(125deg, rgba(244, 63, 94, 0.6), rgba(245, 158, 11, 0.45), rgba(244, 63, 94, 0.6));
+      opacity: 1 !important;
+      transform: scale(1.02);
+    }
+
+    @keyframes ambientPulse {
+      0% { opacity: 0.68; transform: scale(0.995); }
+      100% { opacity: 0.95; transform: scale(1.015); }
+    }
+
+    /* Floating Reaction Bubble Animation */
+    @keyframes floatReaction {
+      0% {
+        opacity: 0;
+        transform: translateY(20px) translateX(0px) scale(0.6);
+      }
+      15% {
+        opacity: 1;
+        transform: translateY(-20px) translateX(var(--sway-1, 14px)) scale(1.08);
+      }
+      50% {
+        opacity: 0.96;
+        transform: translateY(-130px) translateX(var(--sway-2, -16px)) scale(1);
+      }
+      85% {
+        opacity: 0.7;
+        transform: translateY(-240px) translateX(var(--sway-3, 12px)) scale(0.95);
+      }
+      100% {
+        opacity: 0;
+        transform: translateY(-310px) translateX(0px) scale(0.85);
+      }
+    }
+
+    .floating-reaction {
+      position: absolute;
+      bottom: 52px;
+      pointer-events: none;
+      z-index: 35;
+      animation: floatReaction 3.4s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+      will-change: transform, opacity;
+    }
+
+    /* Countdown Pop Animation */
+    @keyframes countPop {
+      0% { transform: scale(0.45); opacity: 0; }
+      35% { transform: scale(1.12); opacity: 1; }
+      80% { transform: scale(1); opacity: 1; }
+      100% { transform: scale(0.92); opacity: 0.85; }
+    }
+    .countdown-digit {
+      animation: countPop 0.85s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+
+    /* Custom Range Scrubber */
+    input[type="range"].cinema-scrubber {
+      -webkit-appearance: none;
+      appearance: none;
+      background: transparent;
+      cursor: pointer;
+    }
+    input[type="range"].cinema-scrubber::-webkit-slider-runnable-track {
+      height: 6px;
+      border-radius: 999px;
+    }
+    input[type="range"].cinema-scrubber::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      height: 16px;
+      width: 16px;
+      border-radius: 50%;
+      background: #fbbf24;
+      border: 2px solid #0a0c12;
+      box-shadow: 0 0 12px rgba(245, 158, 11, 0.8);
+      margin-top: -5px;
+      transition: transform 0.15s ease;
+    }
+    input[type="range"].cinema-scrubber:hover::-webkit-slider-thumb {
+      transform: scale(1.22);
+    }
+
+    /* Scrollbar styling */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(10, 12, 18, 0.6);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(245, 158, 11, 0.25);
+      border-radius: 999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(245, 158, 11, 0.45);
+    }
+
+    /* Passport Ticket Perforation Style */
+    .passport-stamp {
+      background: linear-gradient(145deg, rgba(23, 28, 44, 0.92), rgba(13, 16, 26, 0.96));
+      border: 1px solid rgba(245, 158, 11, 0.24);
+      position: relative;
+    }
+  </style>
+</head>
+<body class="selection:bg-amber-500/30 selection:text-amber-200">
+
+  <!-- Hidden textarea for safe iframe clipboard copy -->
+  <textarea id="clipboardHelper" class="fixed -top-96 left-0 opacity-0 pointer-events-none" aria-hidden="true"></textarea>
+
+  <!-- Global Activity Toast Banner -->
+  <div id="toastContainer" class="fixed top-4 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-2 pointer-events-none w-full max-w-md px-4"></div>
+
+  <!-- =====================================================================
+       VIEW 1: WELCOME & PRIVATE ROOM ENTRY
+  ====================================================================== -->
+  <main id="welcomeView" class="min-h-screen flex items-center justify-center p-4 sm:p-6">
+    <div class="w-full max-w-lg glass-card rounded-3xl p-6 sm:p-9 relative overflow-hidden">
+      <!-- Subtle decorative velvet glow -->
+      <div class="absolute -top-24 -right-24 w-56 h-56 bg-amber-500/10 rounded-full blur-3xl pointer-events-none"></div>
+      <div class="absolute -bottom-24 -left-24 w-56 h-56 bg-rose-500/10 rounded-full blur-3xl pointer-events-none"></div>
+
+      <!-- Brand Marquee -->
+      <div class="text-center mb-7 relative">
+        <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/25 text-amber-400 text-xs font-medium tracking-wider uppercase mb-4">
+          <svg class="w-3.5 h-3.5 text-rose-400" fill="currentColor" viewBox="0 0 20 20"><path d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z"/></svg>
+          Private Velvet Screening Room
+        </div>
+        <h1 class="font-serif text-3xl sm:text-4xl font-bold text-white tracking-tight">
+          Cinema <span class="text-amber-400 italic font-normal">for</span> Two
+        </h1>
+        <p class="text-gray-400 text-sm sm:text-base mt-2 max-w-sm mx-auto leading-relaxed">
+          Sync movies across miles, share live reactions, and stamp every date night into your shared passport.
+        </p>
+      </div>
+
+      <!-- Connection Status Indicator -->
+      <div id="authInitStatus" class="mb-5 flex items-center justify-center gap-2 text-xs text-gray-400">
+        <span class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
+        <span>Preparing private screening theater...</span>
+      </div>
+
+      <!-- Step 1: Display Name -->
+      <div class="space-y-5 relative">
+        <div>
+          <label for="userNameInput" class="block text-xs font-semibold uppercase tracking-wider text-amber-300/90 mb-2">
+            Your Name or Nickname
+          </label>
+          <input
+            id="userNameInput"
+            type="text"
+            maxlength="24"
+            placeholder="e.g., Alex or Babe"
+            class="w-full px-4 py-3.5 rounded-2xl bg-black/40 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:border-amber-400/70 focus:ring-2 focus:ring-amber-500/20 transition text-base"
+          />
+        </div>
+
+        <!-- Invited Room Banner (Shown if #room=XXXXXX is detected in URL) -->
+        <div id="inviteDetectedBanner" class="hidden rounded-2xl bg-rose-500/10 border border-rose-500/30 p-3.5 text-sm text-rose-200 flex items-center justify-between gap-3">
+          <div class="flex items-center gap-2.5">
+            <span class="text-lg">🎟️</span>
+            <span>Partner invite detected for room <strong id="detectedRoomCodeText" class="font-mono text-amber-300">------</strong></span>
+          </div>
+        </div>
+
+        <!-- Action Cards -->
+        <div class="grid grid-cols-1 gap-4 pt-1">
+          <!-- Create Room Button -->
+          <button
+            id="createRoomBtn"
+            type="button"
+            class="w-full py-3.5 px-5 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-obsidian font-semibold text-base shadow-lg shadow-amber-500/20 transition transform active:scale-[0.99] flex items-center justify-center gap-2.5 cursor-pointer"
+          >
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+            Create a Private Room
+          </button>
+
+          <!-- Divider -->
+          <div class="relative flex items-center py-1">
+            <div class="flex-grow border-t border-white/10"></div>
+            <span class="flex-shrink mx-3 text-xs uppercase tracking-widest text-gray-500">or join partner</span>
+            <div class="flex-grow border-t border-white/10"></div>
+          </div>
+
+          <!-- Join Room Input + Button -->
+          <div class="flex flex-col sm:flex-row gap-2.5">
+            <input
+              id="joinCodeInput"
+              type="text"
+              maxlength="6"
+              placeholder="6-CHAR CODE"
+              class="flex-1 px-4 py-3.5 rounded-2xl bg-black/40 border border-white/10 text-white font-mono uppercase tracking-[0.22em] text-center sm:text-left placeholder-gray-600 focus:outline-none focus:border-rose-400/70 focus:ring-2 focus:ring-rose-500/20 transition text-base"
+            />
+            <button
+              id="joinRoomBtn"
+              type="button"
+              class="py-3.5 px-6 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/15 text-white font-semibold text-base transition transform active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <span>Join Room</span>
+              <svg class="w-4 h-4 text-rose-400" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
+            </button>
+          </div>
+          <!-- Memories File Import -->
+          <div class="pt-3 mt-1 border-t border-white/10">
+            <p class="text-xs font-semibold uppercase tracking-wider text-amber-300/90 mb-2">Have a memories file?</p>
+            <button id="welcomeImportBtn" type="button" class="w-full py-2.5 px-4 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 text-gray-200 font-semibold text-xs transition flex items-center justify-center gap-2 cursor-pointer">
+              <span>📂</span><span>Load memories (.jsonl)</span>
+            </button>
+            <input id="welcomeImportInput" type="file" accept=".jsonl,application/json" class="hidden" />
+            <p id="welcomeImportStatus" class="text-[11px] text-gray-500 mt-2 leading-relaxed"></p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- =====================================================================
+       VIEW 2: SCREENING ROOM (ACTIVE WATCH PARTY)
+  ====================================================================== -->
+  <div id="theaterView" class="hidden min-h-screen flex flex-col pb-12">
+
+    <!-- Top Navigation Header -->
+    <header class="sticky top-0 z-40 glass-card border-x-0 border-t-0 rounded-none px-3 sm:px-6 py-3">
+      <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
+        <!-- Brand & Leave -->
+        <div class="flex items-center gap-3">
+          <button id="leaveRoomBtn" title="Switch Room" class="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white transition cursor-pointer">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+          </button>
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="font-serif text-lg sm:text-xl font-bold text-white tracking-tight">Cinema <span class="text-amber-400 italic font-normal">for</span> Two</span>
+            </div>
+            <p class="text-[11px] text-gray-400 hidden sm:block">Signed in as <span id="headerUserName" class="text-amber-300 font-medium">You</span></p>
+          </div>
+        </div>
+
+        <!-- Center/Right Controls: Room Code, Copy Link, Partner Presence -->
+        <div class="flex flex-wrap items-center gap-2 sm:gap-3">
+          <!-- Partner Presence Badge -->
+          <div id="presenceBadge" class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/25 text-xs font-medium text-amber-200">
+            <span id="presenceDot" class="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse"></span>
+            <span id="presenceText">Waiting for partner to join...</span>
+          </div>
+
+          <!-- Room Code + Copy Invite Button -->
+          <div class="flex items-center bg-black/50 border border-white/10 rounded-full p-1 pl-3">
+            <span class="text-[11px] text-gray-400 uppercase mr-1.5 hidden xs:inline">Room</span>
+            <span id="roomCodeBadge" class="font-mono text-xs sm:text-sm font-semibold text-amber-400 tracking-wider mr-2">------</span>
+            <button
+              id="copyInviteBtn"
+              type="button"
+              class="px-3 py-1.5 rounded-full bg-amber-500 hover:bg-amber-400 text-obsidian font-semibold text-xs transition flex items-center gap-1.5 cursor-pointer"
+            >
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+              <span>Copy Invite Link</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Theater Container -->
+    <div class="max-w-7xl w-full mx-auto px-3 sm:px-6 pt-4 sm:pt-6 flex-1">
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+
+        <!-- LEFT / MAIN COLUMN (8 cols on desktop): Source Switcher, Video Stage, Controls, Reactions -->
+        <div class="lg:col-span-8 space-y-4">
+
+          <!-- 1. Dual Video Source Switcher Card -->
+          <section class="glass-card rounded-2xl p-3.5 sm:p-4">
+            <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+              <div class="flex items-center gap-1.5 bg-black/45 p-1 rounded-xl border border-white/5 w-full sm:w-auto">
+                <button type="button" data-source-tab="url" class="source-tab-btn flex-1 sm:flex-initial px-3 py-2 rounded-lg text-xs font-semibold transition bg-amber-500 text-obsidian cursor-pointer">
+                  🔗 Video / YouTube Link
+                </button>
+                <button type="button" data-source-tab="local" class="source-tab-btn flex-1 sm:flex-initial px-3 py-2 rounded-lg text-xs font-semibold transition text-gray-300 hover:text-white cursor-pointer">
+                  📁 Local Video File
+                </button>
+                <button type="button" data-source-tab="samples" class="source-tab-btn flex-1 sm:flex-initial px-3 py-2 rounded-lg text-xs font-semibold transition text-gray-300 hover:text-white cursor-pointer">
+                  🎬 Sample Clips
+                </button>
+              </div>
+
+              <!-- Quick Action Pills: Ready Check & Re-Sync -->
+              <div class="flex items-center gap-2 w-full sm:w-auto justify-end">
+                <button
+                  id="startReadyCheckBtn"
+                  type="button"
+                  class="flex-1 sm:flex-initial px-3.5 py-2 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/35 text-rose-300 text-xs font-semibold transition flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <span>⏱️</span>
+                  <span>3-2-1 Ready Check</span>
+                </button>
+                <button
+                  id="resyncNowBtn"
+                  type="button"
+                  class="flex-1 sm:flex-initial px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-gray-200 text-xs font-semibold transition flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <svg class="w-3.5 h-3.5 text-amber-400" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                  <span>Re-Sync Now</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Tab Panel A: Video / YouTube Link -->
+            <div id="tabPanel-url" class="source-tab-panel">
+              <form id="urlLoadForm" class="flex flex-col sm:flex-row gap-2">
+                <input
+                  id="videoUrlInput"
+                  type="text"
+                  placeholder="Paste YouTube link (youtu.be/...) or direct .mp4 / .webm URL..."
+                  class="flex-1 px-3.5 py-2.5 rounded-xl bg-black/50 border border-white/10 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-amber-400/60"
+                />
+                <button
+                  type="submit"
+                  class="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-obsidian font-semibold text-xs sm:text-sm transition whitespace-nowrap cursor-pointer"
+                >
+                  Load for Both
+                </button>
+              </form>
+            </div>
+
+            <!-- Tab Panel B: Local Video File -->
+            <div id="tabPanel-local" class="source-tab-panel hidden">
+              <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-black/40 border border-dashed border-amber-500/30 rounded-xl p-3">
+                <div class="text-xs text-gray-300 space-y-0.5">
+                  <p class="font-medium text-amber-300">Zero-upload instant local playback</p>
+                  <p class="text-gray-400">Both partners select the same movie file on their own device; timestamps stay synced.</p>
+                  <p id="partnerLocalFileHint" class="hidden text-rose-300 font-medium pt-1"></p>
+                </div>
+                <label class="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-obsidian font-semibold text-xs text-center cursor-pointer transition shrink-0">
+                  Choose Video File
+                  <input id="localFileInput" type="file" accept="video/*" class="hidden" />
+                </label>
+              </div>
+              <div id="localFileSelectedBadge" class="hidden mt-2 text-xs text-emerald-300 flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 rounded-lg px-3 py-1.5">
+                <span>🎞️ Loaded locally:</span>
+                <span id="localFileNameDisplay" class="font-mono truncate"></span>
+              </div>
+            </div>
+
+            <!-- Tab Panel C: Sample Clips -->
+            <div id="tabPanel-samples" class="source-tab-panel hidden">
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                <button
+                  type="button"
+                  data-sample-url="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
+                  data-sample-title="Big Buck Bunny — Animated Short (HD)"
+                  class="sample-clip-btn text-left p-3 rounded-xl bg-black/45 hover:bg-amber-500/10 border border-white/10 hover:border-amber-500/40 transition flex items-center gap-3 cursor-pointer"
+                >
+                  <span class="w-10 h-10 rounded-lg bg-amber-500/15 text-amber-400 flex items-center justify-center text-lg shrink-0">🐰</span>
+                  <div class="min-w-0">
+                    <p class="text-xs font-semibold text-white truncate">Big Buck Bunny (HD Short)</p>
+                    <p class="text-[11px] text-gray-400 truncate">Instant sync test • Open-source cinema</p>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  data-sample-url="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4"
+                  data-sample-title="Sintel — Fantasy Short Film"
+                  class="sample-clip-btn text-left p-3 rounded-xl bg-black/45 hover:bg-rose-500/10 border border-white/10 hover:border-rose-500/40 transition flex items-center gap-3 cursor-pointer"
+                >
+                  <span class="w-10 h-10 rounded-lg bg-rose-500/15 text-rose-400 flex items-center justify-center text-lg shrink-0">🐉</span>
+                  <div class="min-w-0">
+                    <p class="text-xs font-semibold text-white truncate">Sintel — Fantasy Short Film</p>
+                    <p class="text-[11px] text-gray-400 truncate">Atmospheric adventure • Blender Studio</p>
+                  </div>
+                </button>
+              </div>
+            </div>
+          </section>
+
+          <!-- 2. Video Player Stage with Ambient Glow & Floating Reaction Layer -->
+          <section class="cinema-stage-wrapper">
+            <div id="ambientGlow" class="cinema-ambient-glow"></div>
+
+            <div id="playerStage" class="relative z-10 rounded-2xl overflow-hidden bg-black border border-white/10 shadow-2xl aspect-video w-full">
+              <!-- Empty Placeholder Screen -->
+              <div id="emptyPlayerPlaceholder" class="absolute inset-0 flex flex-col items-center justify-center text-center p-6 bg-gradient-to-b from-[#101420] to-[#07090e]">
+                <div class="w-16 h-16 rounded-full bg-amber-500/10 border border-amber-500/25 flex items-center justify-center text-3xl mb-3 shadow-lg shadow-amber-500/10">
+                  🍿
+                </div>
+                <h2 class="font-serif text-xl sm:text-2xl text-white font-semibold">Your Private Screen Awaits</h2>
+                <p class="text-xs sm:text-sm text-gray-400 max-w-md mt-1.5">
+                  Paste a YouTube or video URL above, pick a local movie file on both devices, or tap a Sample Clip to start watching together.
+                </p>
+              </div>
+
+              <!-- HTML5 Video Element (for Local Files, Direct URLs, and Sample Clips) -->
+              <video
+                id="html5VideoPlayer"
+                class="hidden w-full h-full object-contain bg-black"
+                playsinline
+                preload="metadata"
+              ></video>
+
+              <!-- YouTube IFrame Container -->
+              <div id="youtubePlayerWrapper" class="hidden w-full h-full">
+                <div id="youtubePlayerMount" class="w-full h-full"></div>
+              </div>
+
+              <!-- Floating Live Reactions Overlay Layer -->
+              <div id="floatingReactionsLayer" class="absolute inset-0 pointer-events-none overflow-hidden z-30"></div>
+
+              <!-- Now Playing Subtle Pill Badge -->
+              <div id="nowPlayingBanner" class="hidden absolute top-3 left-3 z-20 px-3 py-1 rounded-full bg-black/65 backdrop-blur-md border border-white/10 text-[11px] text-gray-200 flex items-center gap-2 max-w-[75%]">
+                <span class="w-2 h-2 rounded-full bg-rose-500 animate-ping"></span>
+                <span id="nowPlayingTitle" class="truncate">Ready</span>
+              </div>
+
+              <!-- 3-2-1 Ready Check & Countdown Overlay -->
+              <div id="readyCheckOverlay" class="hidden absolute inset-0 z-40 bg-obsidian/90 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center">
+                <!-- Ready Prompt State -->
+                <div id="readyPromptBox" class="max-w-sm w-full space-y-4">
+                  <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs font-semibold uppercase tracking-wider">
+                    Synchronized Start
+                  </div>
+                  <h3 class="font-serif text-2xl sm:text-3xl text-white font-bold">Are You Both Ready?</h3>
+                  <p id="readyStartedByText" class="text-xs sm:text-sm text-gray-300">Tap below when you've got your snacks and volume set.</p>
+
+                  <!-- Participant Status List -->
+                  <div id="readyStatusList" class="flex flex-wrap items-center justify-center gap-2 py-2"></div>
+
+                  <div class="flex items-center justify-center gap-3 pt-1">
+                    <button
+                      id="confirmReadyBtn"
+                      type="button"
+                      class="px-6 py-3 rounded-2xl bg-gradient-to-r from-amber-500 to-rose-500 hover:from-amber-400 hover:to-rose-400 text-obsidian font-bold text-sm shadow-lg shadow-rose-500/25 transition transform active:scale-95 cursor-pointer"
+                    >
+                      I'm Ready 🍿
+                    </button>
+                    <button
+                      id="cancelReadyBtn"
+                      type="button"
+                      class="px-4 py-3 rounded-2xl bg-white/10 hover:bg-white/15 text-gray-300 text-xs font-semibold transition cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Animated Countdown State -->
+                <div id="countdownBox" class="hidden space-y-2">
+                  <div id="countdownNumber" class="countdown-digit font-serif text-7xl sm:text-8xl font-bold text-amber-400 drop-shadow-[0_0_25px_rgba(245,158,11,0.6)]">
+                    3
+                  </div>
+                  <p id="countdownSubtext" class="text-sm sm:text-base text-rose-200 font-medium tracking-wide">
+                    Syncing screens...
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Unified Synced Playback Control Bar -->
+            <div class="relative z-10 mt-2.5 glass-card rounded-2xl px-3.5 py-2.5 flex flex-col gap-2">
+              <!-- Timeline Scrubber -->
+              <div class="flex items-center gap-3">
+                <span id="currentTimeLabel" class="font-mono text-[11px] text-gray-300 w-12 text-right">00:00</span>
+                <input
+                  id="timelineScrubber"
+                  type="range"
+                  min="0"
+                  max="100"
+                  step="0.1"
+                  value="0"
+                  class="cinema-scrubber flex-1 h-2 rounded-lg bg-white/15"
+                />
+                <span id="durationLabel" class="font-mono text-[11px] text-gray-400 w-12">00:00</span>
+              </div>
+
+              <!-- Transport Buttons Row -->
+              <div class="flex items-center justify-between gap-2">
+                <div class="flex items-center gap-1.5 sm:gap-2">
+                  <!-- Play / Pause Button -->
+                  <button
+                    id="playPauseBtn"
+                    type="button"
+                    class="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-obsidian font-semibold text-xs sm:text-sm transition flex items-center gap-1.5 shadow-md shadow-amber-500/20 cursor-pointer"
+                  >
+                    <svg id="playIcon" class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z"/></svg>
+                    <svg id="pauseIcon" class="w-4 h-4 hidden" fill="currentColor" viewBox="0 0 20 20"><path d="M5.75 3a.75.75 0 00-.75.75v12.5c0 .414.336.75.75.75h1.5a.75.75 0 00.75-.75V3.75A.75.75 0 007.25 3h-1.5zM12.75 3a.75.75 0 00-.75.75v12.5c0 .414.336.75.75.75h1.5a.75.75 0 00.75-.75V3.75a.75.75 0 00-.75-.75h-1.5z"/></svg>
+                    <span id="playPauseLabel">Play</span>
+                  </button>
+
+                  <!-- -10s / +10s Skip -->
+                  <button id="skipBackBtn" type="button" title="Rewind 10s" class="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-gray-300 text-xs font-mono transition cursor-pointer">
+                    -10s
+                  </button>
+                  <button id="skipForwardBtn" type="button" title="Forward 10s" class="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-gray-300 text-xs font-mono transition cursor-pointer">
+                    +10s
+                  </button>
+                </div>
+
+                <!-- Right Controls: Sync Status, Mute, Fullscreen -->
+                <div class="flex items-center gap-2">
+                  <span id="syncIndicatorText" class="hidden sm:inline-flex items-center gap-1.5 text-[11px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-full">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                    Live Synced
+                  </span>
+
+                  <button id="muteToggleBtn" type="button" title="Mute / Unmute" class="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-gray-300 transition cursor-pointer">
+                    <svg id="volOnIcon" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/></svg>
+                    <svg id="volOffIcon" class="w-4 h-4 hidden text-rose-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15zM17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2"/></svg>
+                  </button>
+
+                  <button id="fullscreenBtn" type="button" title="Fullscreen" class="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-gray-300 transition cursor-pointer">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/></svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- 3. Tactile Floating Reaction Dock -->
+          <section class="glass-card rounded-2xl p-3 sm:p-4">
+            <div class="flex flex-wrap items-center justify-between gap-2.5">
+              <div class="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                <button type="button" data-emoji="❤️" class="reaction-btn w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-white/5 hover:bg-rose-500/20 border border-white/10 hover:border-rose-500/40 text-xl sm:text-2xl flex items-center justify-center transition transform active:scale-90 cursor-pointer">❤️</button>
+                <button type="button" data-emoji="😂" class="reaction-btn w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-white/5 hover:bg-amber-500/20 border border-white/10 hover:border-amber-500/40 text-xl sm:text-2xl flex items-center justify-center transition transform active:scale-90 cursor-pointer">😂</button>
+                <button type="button" data-emoji="😱" class="reaction-btn w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-white/5 hover:bg-amber-500/20 border border-white/10 hover:border-amber-500/40 text-xl sm:text-2xl flex items-center justify-center transition transform active:scale-90 cursor-pointer">😱</button>
+                <button type="button" data-emoji="😭" class="reaction-btn w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-white/5 hover:bg-amber-500/20 border border-white/10 hover:border-amber-500/40 text-xl sm:text-2xl flex items-center justify-center transition transform active:scale-90 cursor-pointer">😭</button>
+                <button type="button" data-emoji="🍿" class="reaction-btn w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-white/5 hover:bg-amber-500/20 border border-white/10 hover:border-amber-500/40 text-xl sm:text-2xl flex items-center justify-center transition transform active:scale-90 cursor-pointer">🍿</button>
+                <button type="button" data-emoji="🔥" class="reaction-btn w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-white/5 hover:bg-amber-500/20 border border-white/10 hover:border-amber-500/40 text-xl sm:text-2xl flex items-center justify-center transition transform active:scale-90 cursor-pointer">🔥</button>
+                <button type="button" data-emoji="🥺" class="reaction-btn w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-white/5 hover:bg-rose-500/20 border border-white/10 hover:border-rose-500/40 text-xl sm:text-2xl flex items-center justify-center transition transform active:scale-90 cursor-pointer">🥺</button>
+              </div>
+
+              <!-- Special Thinking of You Pulse Button -->
+              <button
+                id="thinkingOfYouBtn"
+                type="button"
+                class="w-full sm:w-auto px-4 py-3 rounded-2xl bg-gradient-to-r from-rose-500/25 to-amber-500/20 hover:from-rose-500/35 hover:to-amber-500/30 border border-rose-400/40 text-rose-200 font-semibold text-xs sm:text-sm transition transform active:scale-95 flex items-center justify-center gap-2 shadow-lg shadow-rose-500/10 cursor-pointer"
+              >
+                <span class="text-base">💌</span>
+                <span>Thinking of You</span>
+              </button>
+            </div>
+          </section>
+        </div>
+
+        <!-- RIGHT COLUMN (4 cols on desktop): Collapsible Whisper Chat + Together Rating & Movie Passport -->
+        <div class="lg:col-span-4 space-y-4">
+
+          <!-- 4. Whisper Chat Drawer Card -->
+          <section class="glass-card rounded-2xl overflow-hidden">
+            <button
+              id="toggleWhisperBtn"
+              type="button"
+              class="w-full px-4 py-3.5 flex items-center justify-between text-left hover:bg-white/[0.02] transition cursor-pointer"
+            >
+              <div class="flex items-center gap-2.5">
+                <span class="text-base">💬</span>
+                <div>
+                  <h3 class="text-sm font-semibold text-white">Whisper Chat</h3>
+                  <p class="text-[11px] text-gray-400">Timestamped notes during the show</p>
+                </div>
+              </div>
+              <div class="flex items-center gap-2">
+                <span id="whisperUnreadBadge" class="hidden px-2 py-0.5 rounded-full bg-rose-500 text-white text-[10px] font-bold">New</span>
+                <svg id="whisperChevron" class="w-4 h-4 text-gray-400 transition-transform duration-200" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+              </div>
+            </button>
+
+            <div id="whisperDrawerBody" class="border-t border-white/10 p-3.5 space-y-3">
+              <!-- Messages List -->
+              <div id="whisperMessagesList" class="h-52 overflow-y-auto space-y-2.5 pr-1 flex flex-col">
+                <div class="text-center text-xs text-gray-500 my-auto py-6">
+                  No whispers yet — send a sweet note or timestamped reaction!
+                </div>
+              </div>
+
+              <!-- Quick Whisper Chips -->
+              <div class="flex items-center gap-1.5 overflow-x-auto pb-1">
+                <button type="button" data-quick-whisper="Wait rewind that! ⏪" class="quick-whisper-btn shrink-0 px-2.5 py-1 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-[11px] text-gray-300 transition cursor-pointer">Rewind that ⏪</button>
+                <button type="button" data-quick-whisper="Snack break in 2 mins? 🍿" class="quick-whisper-btn shrink-0 px-2.5 py-1 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-[11px] text-gray-300 transition cursor-pointer">Snack break? 🍿</button>
+                <button type="button" data-quick-whisper="I love this part ✨" class="quick-whisper-btn shrink-0 px-2.5 py-1 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-[11px] text-gray-300 transition cursor-pointer">Love this ✨</button>
+              </div>
+
+              <!-- Whisper Input Form -->
+              <form id="whisperForm" class="flex gap-2">
+                <input
+                  id="whisperInput"
+                  type="text"
+                  maxlength="220"
+                  placeholder="Whisper something..."
+                  class="flex-1 px-3.5 py-2.5 rounded-xl bg-black/50 border border-white/10 text-xs sm:text-sm text-white placeholder-gray-500 focus:outline-none focus:border-amber-400/60"
+                />
+                <button
+                  type="submit"
+                  class="px-3.5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-obsidian font-semibold text-xs transition cursor-pointer"
+                >
+                  Send
+                </button>
+              </form>
+            </div>
+          </section>
+
+          <!-- 5. Rate Movie Together & Shared Movie Passport Card -->
+          <section class="glass-card rounded-2xl p-4 space-y-4">
+            <div class="flex items-center justify-between gap-2">
+              <div>
+                <h3 class="font-serif text-lg font-bold text-white flex items-center gap-2">
+                  <span>🛂</span>
+                  <span>Movie Passport</span>
+                </h3>
+                <p class="text-[11px] text-gray-400">Rate together & save your date-night memories</p>
+              </div>
+              <button
+                id="toggleRatePanelBtn"
+                type="button"
+                class="px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-obsidian font-semibold text-xs shadow-md shadow-amber-500/15 transition cursor-pointer"
+              >
+                ★ Rate Movie Together
+              </button>
+            </div>
+
+            <!-- Collapsible Rating Panel -->
+            <div id="rateMoviePanel" class="hidden rounded-2xl bg-black/45 border border-amber-500/25 p-3.5 space-y-3.5">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-semibold uppercase tracking-wider text-amber-400">Tonight's Feature</span>
+                <button id="closeRatePanelBtn" type="button" class="text-xs text-gray-400 hover:text-white cursor-pointer">Close ✕</button>
+              </div>
+
+              <!-- Movie Title -->
+              <div>
+                <label class="block text-[11px] text-gray-400 mb-1">Movie / Video Title</label>
+                <input
+                  id="ratingMovieTitleInput"
+                  type="text"
+                  placeholder="Enter movie title..."
+                  class="w-full px-3 py-2 rounded-xl bg-black/50 border border-white/10 text-xs sm:text-sm text-white focus:outline-none focus:border-amber-400/60"
+                />
+              </div>
+
+              <!-- Half-Star Interactive Rating -->
+              <div>
+                <div class="flex items-center justify-between mb-1.5">
+                  <label class="text-[11px] text-gray-400">Your Star Rating (tap left/right half)</label>
+                  <span id="myRatingNumeric" class="font-mono text-xs font-bold text-amber-400">4.5 / 5.0 ★</span>
+                </div>
+                <div id="starSelectorContainer" class="flex items-center gap-1.5"></div>
+              </div>
+
+              <!-- Mood / Vibe Tags -->
+              <div>
+                <label class="block text-[11px] text-gray-400 mb-1.5">Vibe Tags</label>
+                <div id="vibeTagsContainer" class="flex flex-wrap gap-1.5">
+                  <button type="button" data-vibe="Cozy" class="vibe-tag-btn px-2.5 py-1 rounded-full text-[11px] border border-white/15 bg-white/5 text-gray-300 transition cursor-pointer">Cozy</button>
+                  <button type="button" data-vibe="Tearjerker" class="vibe-tag-btn px-2.5 py-1 rounded-full text-[11px] border border-white/15 bg-white/5 text-gray-300 transition cursor-pointer">Tearjerker</button>
+                  <button type="button" data-vibe="Hilarious" class="vibe-tag-btn px-2.5 py-1 rounded-full text-[11px] border border-white/15 bg-white/5 text-gray-300 transition cursor-pointer">Hilarious</button>
+                  <button type="button" data-vibe="Thriller" class="vibe-tag-btn px-2.5 py-1 rounded-full text-[11px] border border-white/15 bg-white/5 text-gray-300 transition cursor-pointer">Thriller</button>
+                  <button type="button" data-vibe="Romantic" class="vibe-tag-btn px-2.5 py-1 rounded-full text-[11px] border border-white/15 bg-white/5 text-gray-300 transition cursor-pointer">Romantic</button>
+                  <button type="button" data-vibe="Rewatch Worthy" class="vibe-tag-btn px-2.5 py-1 rounded-full text-[11px] border border-white/15 bg-white/5 text-gray-300 transition cursor-pointer">Rewatch Worthy</button>
+                </div>
+              </div>
+
+              <!-- Favorite Quote / Memory Note -->
+              <div>
+                <label class="block text-[11px] text-gray-400 mb-1">Favorite Quote or Memory Note</label>
+                <textarea
+                  id="ratingNoteInput"
+                  rows="2"
+                  maxlength="240"
+                  placeholder="Write a favorite line or a note from tonight..."
+                  class="w-full px-3 py-2 rounded-xl bg-black/50 border border-white/10 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-amber-400/60 resize-none"
+                ></textarea>
+              </div>
+
+              <button
+                id="submitMyRatingBtn"
+                type="button"
+                class="w-full py-2.5 rounded-xl bg-rose-500 hover:bg-rose-400 text-white font-semibold text-xs transition cursor-pointer"
+              >
+                Submit My Rating
+              </button>
+
+              <!-- Side-by-Side Live Comparison Box -->
+              <div id="liveRatingComparisonBox" class="hidden pt-2 border-t border-white/10 space-y-2.5">
+                <div class="flex items-center justify-between">
+                  <span class="text-[11px] uppercase tracking-wider text-gray-400 font-semibold">Live Couple Score</span>
+                  <span id="coupleAverageBadge" class="px-2.5 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 font-mono text-xs font-bold">-- ★</span>
+                </div>
+                <div id="sideBySideRatingsGrid" class="grid grid-cols-2 gap-2"></div>
+                <button
+                  id="stampPassportBtn"
+                  type="button"
+                  class="w-full py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-rose-500 hover:from-amber-400 hover:to-rose-400 text-obsidian font-bold text-xs shadow-lg transition cursor-pointer"
+                >
+                  Stamp into Shared Movie Passport ✨
+                </button>
+              </div>
+            </div>
+
+            <!-- Shared Movie Passport Timeline -->
+            <div class="space-y-2.5">
+              <div class="flex items-center justify-between text-[11px] text-gray-400">
+                <span>Stamped Memories</span>
+                <span id="passportCountBadge" class="font-mono text-amber-400">0 films</span>
+              </div>
+              <div id="passportTimelineList" class="space-y-2.5 max-h-80 overflow-y-auto pr-1">
+                <div class="rounded-xl border border-dashed border-white/10 p-4 text-center text-xs text-gray-500">
+                  Your passport is ready for its first stamp! Tap <strong class="text-amber-400">★ Rate Movie Together</strong> after watching.
+                </div>
+              </div>
+            <!-- Memories Backup: JSONL Export / Import -->
+            <div class="pt-3 border-t border-white/10 space-y-2">
+              <p class="text-[11px] text-gray-400 leading-relaxed">Memories live on this device + your .jsonl file — no cloud yet. Download the file to keep them safe, or load one to restore them.</p>
+              <div class="flex gap-2">
+                <button id="exportLogBtn" type="button" class="flex-1 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-gray-200 font-semibold text-xs transition cursor-pointer">⬇ Download memories (.jsonl)</button>
+                <label class="flex-1 py-2.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-200 font-semibold text-xs transition cursor-pointer flex items-center justify-center text-center">
+                  📂 Load memories file
+                  <input id="passportImportInput" type="file" accept=".jsonl,application/json" class="hidden" />
+                </label>
+              </div>
+            </div>
+            </div>
+          </section>
+
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =====================================================================
+       APPLICATION LOGIC — PEERJS LIVE SYNC + JSONL MEMORIES
+  ====================================================================== -->
+  <script>
+// =========================================================================
+// Cinema for Two — PeerJS live sync + JSONL memories (no backend, no accounts)
+// Live: PeerJS 1.5.4 (free public signalling server, browser-to-browser).
+// Memory: append-only JSONL log, same pattern as the crash bot's
+// signal-history-archive.jsonl. The log lives in localStorage per room and
+// can be downloaded / loaded as a .jsonl file — the file IS the backup.
+// =========================================================================
+
+const PEERJS_HOST_PREFIX = 'c2t-';
+const LOG_VERSION = 1;
+
+// =========================================================================
+// 1. GLOBAL STATE
+// =========================================================================
+const state = {
+  userName: '',
+  userId: '', // local id, e.g. c2t-user-a1b2c3d4 — generated once, kept forever
+  roomCode: '',
+  roomData: null, // derived from the log: {media, playback, participants, readyCheck, ratingSession, whispers, passport}
+  mediaType: 'none', // 'none' | 'youtube' | 'url' | 'local'
+  mediaUrl: '',
+  mediaTitle: '',
+  isRemoteSync: false,
+  remoteSyncTimer: null,
+  lastProcessedSeq: 0,
+  lastWhisperCount: 0,
+  isWhisperOpen: true,
+  selectedRating: 4.5,
+  selectedVibes: new Set(['Cozy']),
+  ytPlayer: null,
+  ytApiReady: false,
+  pendingYtVideoId: null,
+  countdownInterval: null,
+  activeCountdownStartAt: null,
+  presenceHeartbeatInterval: null,
+  playerTickInterval: null,
+  positionSaveInterval: null,
+  peerRetryInterval: null,
+  peer: null,
+  peerId: '',
+  conn: null,
+  isHost: false,
+  peerConnected: false,
+  partnerName: '',
+  partnerUid: '',
+  lastPongAt: 0,
+  logLines: [], // parsed JSONL log objects, in order
+  pendingImportLines: [], // .jsonl lines loaded on the welcome screen, applied on room entry
+  readyCheck: { active: false, startedBy: '', startedByUid: '', readyUsers: {}, countdownStartAt: null }
+};
+
+// DOM References
+const dom = {
+  welcomeView: document.getElementById('welcomeView'),
+  theaterView: document.getElementById('theaterView'),
+  authInitStatus: document.getElementById('authInitStatus'),
+  userNameInput: document.getElementById('userNameInput'),
+  inviteDetectedBanner: document.getElementById('inviteDetectedBanner'),
+  detectedRoomCodeText: document.getElementById('detectedRoomCodeText'),
+  createRoomBtn: document.getElementById('createRoomBtn'),
+  joinCodeInput: document.getElementById('joinCodeInput'),
+  joinRoomBtn: document.getElementById('joinRoomBtn'),
+  welcomeImportBtn: document.getElementById('welcomeImportBtn'),
+  welcomeImportInput: document.getElementById('welcomeImportInput'),
+  welcomeImportStatus: document.getElementById('welcomeImportStatus'),
+  leaveRoomBtn: document.getElementById('leaveRoomBtn'),
+  headerUserName: document.getElementById('headerUserName'),
+  presenceBadge: document.getElementById('presenceBadge'),
+  presenceDot: document.getElementById('presenceDot'),
+  presenceText: document.getElementById('presenceText'),
+  roomCodeBadge: document.getElementById('roomCodeBadge'),
+  copyInviteBtn: document.getElementById('copyInviteBtn'),
+  videoUrlInput: document.getElementById('videoUrlInput'),
+  urlLoadForm: document.getElementById('urlLoadForm'),
+  localFileInput: document.getElementById('localFileInput'),
+  localFileSelectedBadge: document.getElementById('localFileSelectedBadge'),
+  localFileNameDisplay: document.getElementById('localFileNameDisplay'),
+  partnerLocalFileHint: document.getElementById('partnerLocalFileHint'),
+  ambientGlow: document.getElementById('ambientGlow'),
+  playerStage: document.getElementById('playerStage'),
+  emptyPlayerPlaceholder: document.getElementById('emptyPlayerPlaceholder'),
+  html5VideoPlayer: document.getElementById('html5VideoPlayer'),
+  youtubePlayerWrapper: document.getElementById('youtubePlayerWrapper'),
+  floatingReactionsLayer: document.getElementById('floatingReactionsLayer'),
+  nowPlayingBanner: document.getElementById('nowPlayingBanner'),
+  nowPlayingTitle: document.getElementById('nowPlayingTitle'),
+  readyCheckOverlay: document.getElementById('readyCheckOverlay'),
+  readyPromptBox: document.getElementById('readyPromptBox'),
+  readyStartedByText: document.getElementById('readyStartedByText'),
+  readyStatusList: document.getElementById('readyStatusList'),
+  confirmReadyBtn: document.getElementById('confirmReadyBtn'),
+  cancelReadyBtn: document.getElementById('cancelReadyBtn'),
+  countdownBox: document.getElementById('countdownBox'),
+  countdownNumber: document.getElementById('countdownNumber'),
+  countdownSubtext: document.getElementById('countdownSubtext'),
+  startReadyCheckBtn: document.getElementById('startReadyCheckBtn'),
+  resyncNowBtn: document.getElementById('resyncNowBtn'),
+  currentTimeLabel: document.getElementById('currentTimeLabel'),
+  durationLabel: document.getElementById('durationLabel'),
+  timelineScrubber: document.getElementById('timelineScrubber'),
+  playPauseBtn: document.getElementById('playPauseBtn'),
+  playIcon: document.getElementById('playIcon'),
+  pauseIcon: document.getElementById('pauseIcon'),
+  playPauseLabel: document.getElementById('playPauseLabel'),
+  skipBackBtn: document.getElementById('skipBackBtn'),
+  skipForwardBtn: document.getElementById('skipForwardBtn'),
+  muteToggleBtn: document.getElementById('muteToggleBtn'),
+  volOnIcon: document.getElementById('volOnIcon'),
+  volOffIcon: document.getElementById('volOffIcon'),
+  fullscreenBtn: document.getElementById('fullscreenBtn'),
+  thinkingOfYouBtn: document.getElementById('thinkingOfYouBtn'),
+  toggleWhisperBtn: document.getElementById('toggleWhisperBtn'),
+  whisperUnreadBadge: document.getElementById('whisperUnreadBadge'),
+  whisperChevron: document.getElementById('whisperChevron'),
+  whisperDrawerBody: document.getElementById('whisperDrawerBody'),
+  whisperMessagesList: document.getElementById('whisperMessagesList'),
+  whisperForm: document.getElementById('whisperForm'),
+  whisperInput: document.getElementById('whisperInput'),
+  toggleRatePanelBtn: document.getElementById('toggleRatePanelBtn'),
+  closeRatePanelBtn: document.getElementById('closeRatePanelBtn'),
+  rateMoviePanel: document.getElementById('rateMoviePanel'),
+  ratingMovieTitleInput: document.getElementById('ratingMovieTitleInput'),
+  myRatingNumeric: document.getElementById('myRatingNumeric'),
+  starSelectorContainer: document.getElementById('starSelectorContainer'),
+  vibeTagsContainer: document.getElementById('vibeTagsContainer'),
+  ratingNoteInput: document.getElementById('ratingNoteInput'),
+  submitMyRatingBtn: document.getElementById('submitMyRatingBtn'),
+  liveRatingComparisonBox: document.getElementById('liveRatingComparisonBox'),
+  coupleAverageBadge: document.getElementById('coupleAverageBadge'),
+  sideBySideRatingsGrid: document.getElementById('sideBySideRatingsGrid'),
+  stampPassportBtn: document.getElementById('stampPassportBtn'),
+  passportCountBadge: document.getElementById('passportCountBadge'),
+  passportTimelineList: document.getElementById('passportTimelineList'),
+  exportLogBtn: document.getElementById('exportLogBtn'),
+  passportImportInput: document.getElementById('passportImportInput'),
+  toastContainer: document.getElementById('toastContainer'),
+  clipboardHelper: document.getElementById('clipboardHelper')
+};
+
+// =========================================================================
+// 2. UTILITY HELPERS (TOASTS, CLIPBOARD, TIME FORMATTING, YOUTUBE PARSER)
+// =========================================================================
+function showToast(message, variant = 'gold') {
+  const el = document.createElement('div');
+  const borderClass =
+    variant === 'rose'
+      ? 'border-rose-500/45 bg-[#1a1019]/95 text-rose-100'
+      : variant === 'emerald'
+      ? 'border-emerald-500/45 bg-[#0e1b18]/95 text-emerald-100'
+      : 'border-amber-500/45 bg-[#171410]/95 text-amber-100';
+
+  el.className = `pointer-events-auto px-4 py-2.5 rounded-full border ${borderClass} backdrop-blur-md shadow-xl text-xs sm:text-sm font-medium flex items-center gap-2 transition-all duration-300 transform -translate-y-2 opacity-0`;
+  el.textContent = message;
+  dom.toastContainer.appendChild(el);
+
+  requestAnimationFrame(() => {
+    el.classList.remove('-translate-y-2', 'opacity-0');
+  });
+
+  setTimeout(() => {
+    el.classList.add('-translate-y-2', 'opacity-0');
+    setTimeout(() => el.remove(), 300);
+  }, 3200);
+}
+
+function copyTextSafely(text) {
+  const done = () => showToast('Invite link copied! Send it to your partner 🎟️', 'emerald');
+  const fallback = () => {
+    try {
+      dom.clipboardHelper.value = text;
+      dom.clipboardHelper.select();
+      dom.clipboardHelper.setSelectionRange(0, 99999);
+      const ok = document.execCommand('copy');
+      if (ok) done();
+      else showToast(`Share Room Code: ${state.roomCode}`, 'gold');
+    } catch (err) {
+      showToast(`Share Room Code: ${state.roomCode}`, 'gold');
+    }
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(done).catch(fallback);
+  } else {
+    fallback();
+  }
+}
+
+function formatTime(seconds) {
+  if (!Number.isFinite(seconds) || seconds < 0) return '00:00';
+  const total = Math.floor(seconds);
+  const hrs = Math.floor(total / 3600);
+  const mins = Math.floor((total % 3600) / 60);
+  const secs = total % 60;
+  if (hrs > 0) {
+    return `${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+  }
+  return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+}
+
+function generateRoomCode() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let code = '';
+  for (let i = 0; i < 6; i++) {
+    code += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return code;
+}
+
+function genId(len = 12) {
+  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+  let out = '';
+  for (let i = 0; i < len; i++) {
+    out += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return out;
+}
+
+function extractYouTubeId(url) {
+  if (!url) return null;
+  const trimmed = url.trim();
+  const patterns = [
+    /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/v\/|youtube\.com\/shorts\/)([a-zA-Z0-9_-]{11})/,
+    /^([a-zA-Z0-9_-]{11})$/
+  ];
+  for (const p of patterns) {
+    const match = trimmed.match(p);
+    if (match && match[1]) return match[1];
+  }
+  return null;
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str || '';
+  return div.innerHTML;
+}
+
+function parseHashRoomCode() {
+  const hash = window.location.hash || '';
+  const match = hash.match(/room=([A-Za-z0-9]{4,8})/i);
+  return match ? match[1].toUpperCase() : '';
+}
+
+// Local user id: generated once per browser, kept forever in localStorage.
+function initLocalUserId() {
+  try {
+    let id = localStorage.getItem('c2t-user-id');
+    if (!id) {
+      id = 'c2t-user-' + genId(8);
+      localStorage.setItem('c2t-user-id', id);
+    }
+    state.userId = id;
+  } catch (_) {
+    state.userId = 'c2t-user-' + genId(8);
+  }
+  try {
+    const savedName = localStorage.getItem('c2t-user-name');
+    if (savedName && dom.userNameInput) dom.userNameInput.value = savedName;
+  } catch (_) {}
+}
+
+// =========================================================================
+// 3. JSONL MEMORY LOG
+// One line = one JSON object:
+// { id, v: 1, type, room, at (epoch ms), by (local user id), byName, data }
+// Types: media | playback | whisper | rating | rating-clear |
+//        passport | passport-delete
+// Reactions, presence and ready-check are ephemeral: PeerJS only, never logged.
+// =========================================================================
+function logStorageKey(code) {
+  return 'c2t-log-' + code;
+}
+
+function logToText(lines) {
+  return lines.map((l) => JSON.stringify(l)).join('\n');
+}
+
+function loadLog() {
+  state.logLines = [];
+  if (!state.roomCode) return;
+  try {
+    const text = localStorage.getItem(logStorageKey(state.roomCode)) || '';
+    if (!text.trim()) return;
+    text.split('\n').forEach((raw) => {
+      const line = raw.trim();
+      if (!line) return;
+      try {
+        const obj = JSON.parse(line);
+        if (obj && obj.id && obj.type && obj.at) state.logLines.push(obj);
+      } catch (_) {
+        // Skip a corrupt line; the rest of the log still replays.
+      }
+    });
+  } catch (_) {}
+}
+
+function saveLog() {
+  if (!state.roomCode) return;
+  try {
+    localStorage.setItem(logStorageKey(state.roomCode), logToText(state.logLines));
+  } catch (err) {
+    console.error('Could not save memories on this device:', err);
+    showToast('Memories could not be saved on this device — download the .jsonl backup!', 'rose');
+  }
+}
+
+function appendLog(type, data) {
+  const line = {
+    id: genId(12),
+    v: LOG_VERSION,
+    type,
+    room: state.roomCode,
+    at: Date.now(),
+    by: state.userId,
+    byName: state.userName,
+    data: data || {}
+  };
+  state.logLines.push(line);
+  saveLog();
+  return line;
+}
+
+// Merge incoming lines by id (dedupes). Returns how many were new.
+function mergeLogLines(lines) {
+  if (!lines || !lines.length) return 0;
+  const known = new Set(state.logLines.map((l) => l.id));
+  let added = 0;
+  lines.forEach((line) => {
+    if (!line || !line.id || !line.type || !line.at) return;
+    if (line.room && line.room !== state.roomCode) return;
+    if (known.has(line.id)) return;
+    known.add(line.id);
+    state.logLines.push(line);
+    added++;
+  });
+  if (added > 0) {
+    state.logLines.sort((a, b) => (a.at || 0) - (b.at || 0));
+    saveLog();
+  }
+  return added;
+}
+
+// Replay the whole log into room state. Last media/playback line wins;
+// whispers / ratings / passport accumulate by id; deletes are tombstones.
+function replayLog() {
+  const prev = state.roomData || {};
+  const next = {
+    media: prev.media || { type: 'none', url: '', title: '', localFileName: '', updatedBy: '', updatedByName: '', updatedAt: 0 },
+    playback: prev.playback || { isPlaying: false, currentTime: 0, updatedAt: 0, updatedBy: '', updatedByName: '', actionLabel: 'opened room', seq: 0 },
+    participants: prev.participants || {},
+    readyCheck: prev.readyCheck || { active: false, startedBy: '', readyUsers: {}, countdownStartAt: null },
+    ratingSession: { movieTitle: '', submissions: {} },
+    whispers: [],
+    passport: []
+  };
+  const deletedPassportIds = new Set();
+  const lines = state.logLines.slice().sort((a, b) => (a.at || 0) - (b.at || 0));
+  lines.forEach((line) => {
+    const d = line.data || {};
+    if (line.type === 'media') {
+      next.media = {
+        type: d.type || 'none',
+        url: d.url || '',
+        title: d.title || '',
+        localFileName: d.localFileName || '',
+        updatedBy: line.by || '',
+        updatedByName: line.byName || '',
+        updatedAt: line.at
+      };
+    } else if (line.type === 'playback') {
+      next.playback = {
+        isPlaying: Boolean(d.isPlaying),
+        currentTime: Number(d.currentTime) || 0,
+        updatedAt: line.at,
+        updatedBy: line.by || '',
+        updatedByName: line.byName || '',
+        actionLabel: d.actionLabel || (d.isPlaying ? 'played' : 'paused'),
+        seq: Number(d.seq) || 0
+      };
+      // NOTE: lastProcessedSeq is advanced only in applyRemotePlaybackState,
+      // which uses it to ignore stale remote updates (replay runs before apply).
+    } else if (line.type === 'whisper') {
+      next.whispers.push({
+        id: line.id,
+        senderUid: line.by || '',
+        senderName: d.senderName || line.byName || '',
+        text: d.text || '',
+        movieTimestamp: d.movieTimestamp || '',
+        createdAt: line.at
+      });
+    } else if (line.type === 'rating') {
+      const sub = d.submission;
+      if (sub && sub.uid) {
+        next.ratingSession.submissions[sub.uid] = sub;
+        if (d.movieTitle) next.ratingSession.movieTitle = d.movieTitle;
+      }
+    } else if (line.type === 'rating-clear') {
+      next.ratingSession = { movieTitle: '', submissions: {} };
+    } else if (line.type === 'passport') {
+      if (d.entry && d.entry.id) next.passport.push(d.entry);
+    } else if (line.type === 'passport-delete') {
+      if (d.entryId) deletedPassportIds.add(d.entryId);
+    }
+  });
+  if (deletedPassportIds.size) {
+    next.passport = next.passport.filter((e) => !deletedPassportIds.has(e.id));
+  }
+  next.whispers.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+  next.passport.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  state.roomData = next;
+}
+
+function renderAllFromLog() {
+  renderWhisperMessages(state.roomData.whispers);
+  renderPassportTimeline(state.roomData.passport);
+  renderLiveRatingComparison(state.roomData.ratingSession);
+  if (state.roomData.media && state.roomData.media.type !== 'none') {
+    applySavedMedia();
+  }
+  updateTimelineUI();
+}
+
+// Mount the saved media (from the log) into the player. Local files cannot
+// be re-mounted automatically — the file lives on each device, so we show
+// the badge and ask the partner to pick the same file again.
+function applySavedMedia() {
+  const media = state.roomData.media;
+  if (!media || media.type === 'none') return;
+  // Never re-mount the same media: re-mounting a YouTube video restarts it.
+  const mediaKey = media.type + '|' + (media.url || '') + '|' + (media.updatedAt || 0);
+  if (state.lastMountedMediaKey === mediaKey) return;
+  state.lastMountedMediaKey = mediaKey;
+  if (media.type === 'youtube' && media.url) {
+    state.mediaType = 'youtube';
+    state.mediaUrl = media.url;
+    dom.nowPlayingBanner.classList.remove('hidden');
+    dom.nowPlayingTitle.textContent = media.title || 'YouTube Feature';
+    mountYouTubePlayer(media.url);
+  } else if (media.type === 'url' && media.url) {
+    state.mediaType = 'url';
+    state.mediaUrl = media.url;
+    mountHtml5Video(media.url, media.title || 'Shared Video Stream');
+  } else if (media.type === 'local') {
+    state.mediaType = 'local';
+    dom.localFileSelectedBadge.classList.remove('hidden');
+    dom.localFileNameDisplay.textContent = (media.localFileName || 'previous file') + ' — pick the same file again to continue';
+    dom.partnerLocalFileHint.classList.remove('hidden');
+    dom.partnerLocalFileHint.textContent = `Last time you watched local file "${media.localFileName || ''}" — pick the same file on your device to continue from ${formatTime(state.roomData.playback.currentTime || 0)}.`;
+    switchSourceTab('local');
+  }
+  if (media.title && !dom.ratingMovieTitleInput.value) {
+    dom.ratingMovieTitleInput.value = media.title;
+  }
+}
+
+// =========================================================================
+// 4. PEERJS LIVE SYNC (no backend — free public signalling server)
+// Host id is the room code: c2t-<CODE>. Whoever opens the room first
+// claims it; the other side gets "unavailable-id" and joins as a guest.
+// =========================================================================
+function peerHostId(code) {
+  return PEERJS_HOST_PREFIX + code;
+}
+
+function sendPeerMessage(msg) {
+  if (!state.conn || !state.peerConnected) return false;
+  try {
+    state.conn.send(msg);
+    return true;
+  } catch (err) {
+    console.error('Failed to send to partner:', err);
+    return false;
+  }
+}
+
+function setupPeer() {
+  cleanupPeer();
+  if (typeof Peer === 'undefined') {
+    setPeerOffline('PeerJS library did not load — check your connection and refresh.');
+    return;
+  }
+  const hostId = peerHostId(state.roomCode);
+  try {
+    state.peer = new Peer(hostId);
+  } catch (err) {
+    console.error('Peer create error:', err);
+    setPeerOffline('Could not start live sync — memories still save on this device.');
+    return;
+  }
+  state.peer.on('open', (id) => {
+    state.isHost = true;
+    state.peerId = id;
+    updatePartnerPresenceUI();
+  });
+  state.peer.on('connection', (conn) => {
+    attachConn(conn);
+  });
+  state.peer.on('error', (err) => {
+    if (err && err.type === 'unavailable-id') {
+      // The room is already hosted (partner is here) — join as a guest.
+      try { state.peer.destroy(); } catch (_) {}
+      state.peer = new Peer('c2t-guest-' + genId(6));
+      state.peer.on('open', () => {
+        state.isHost = false;
+        try {
+          state.conn = state.peer.connect(hostId, { reliable: true });
+          attachConn(state.conn);
+        } catch (e) {
+          console.error('Guest connect error:', e);
+          setPeerOffline();
+        }
+      });
+      state.peer.on('error', (e2) => {
+        console.error('Guest peer error:', e2);
+        setPeerOffline();
+      });
+      state.peer.on('disconnected', () => setPeerOffline());
+    } else if (err && (err.type === 'peer-unavailable' || err.type === 'network' || err.type === 'server-error' || err.type === 'socket-error' || err.type === 'socket-closed')) {
+      setPeerOffline();
+    } else {
+      console.error('Peer error:', err);
+    }
+  });
+  state.peer.on('disconnected', () => setPeerOffline());
+}
+
+function attachConn(conn) {
+  if (!conn) return;
+  // Only one partner: replace any previous connection.
+  if (state.conn && state.conn !== conn) {
+    try { state.conn.close(); } catch (_) {}
+  }
+  state.conn = conn;
+  conn.on('open', () => {
+    state.peerConnected = true;
+    state.lastPongAt = Date.now();
+    updatePartnerPresenceUI();
+    // Say hello, then swap full logs so both sides end up identical.
+    sendPeerMessage({ kind: 'hello', from: state.userId, fromName: state.userName, at: Date.now() });
+    sendPeerMessage({ kind: 'log-lines', from: state.userId, fromName: state.userName, at: Date.now(), lines: state.logLines });
+    sendPeerMessage({ kind: 'snapshot', from: state.userId, fromName: state.userName, at: Date.now(), media: state.roomData.media, playback: state.roomData.playback });
+  });
+  conn.on('data', (msg) => {
+    handlePeerMessage(msg);
+  });
+  conn.on('close', () => {
+    state.peerConnected = false;
+    state.partnerName = '';
+    state.partnerUid = '';
+    updatePartnerPresenceUI();
+  });
+  conn.on('error', (err) => {
+    console.error('Connection error:', err);
+    state.peerConnected = false;
+    updatePartnerPresenceUI();
+  });
+}
+
+function cleanupPeer() {
+  if (state.peerRetryInterval) { clearInterval(state.peerRetryInterval); state.peerRetryInterval = null; }
+  if (state.presenceHeartbeatInterval) { clearInterval(state.presenceHeartbeatInterval); state.presenceHeartbeatInterval = null; }
+  if (state.playerTickInterval) { clearInterval(state.playerTickInterval); state.playerTickInterval = null; }
+  if (state.positionSaveInterval) { clearInterval(state.positionSaveInterval); state.positionSaveInterval = null; }
+  if (state.countdownInterval) { clearInterval(state.countdownInterval); state.countdownInterval = null; }
+  try { if (state.conn) state.conn.close(); } catch (_) {}
+  try { if (state.peer) state.peer.destroy(); } catch (_) {}
+  state.conn = null;
+  state.peer = null;
+  state.peerConnected = false;
+  state.isHost = false;
+  state.partnerName = '';
+  state.partnerUid = '';
+}
+
+function setPeerOffline(note) {
+  state.peerConnected = false;
+  updatePartnerPresenceUI();
+  if (note) showToast(note, 'rose');
+  // Guest retry: if we are a guest and the host is not there yet, keep
+  // trying every 5s while the theater is open.
+  if (!state.isHost && state.peer && !state.peer.destroyed && !state.peerRetryInterval) {
+    state.peerRetryInterval = setInterval(() => {
+      if (state.peerConnected || !state.peer || state.peer.destroyed) {
+        clearInterval(state.peerRetryInterval);
+        state.peerRetryInterval = null;
+        return;
+      }
+      try {
+        state.conn = state.peer.connect(peerHostId(state.roomCode), { reliable: true });
+        attachConn(state.conn);
+      } catch (_) {}
+    }, 5000);
+  }
+}
+
+// =========================================================================
+// 5. PEER MESSAGE PROTOCOL
+// hello | log-lines | log-line | snapshot | reaction |
+// ready-start | ready-confirm | ready-cancel | countdown-start |
+// ping | pong | resync-request
+// State-changing messages carry a full JSONL log line ({kind:'log-line'})
+// so both sides' logs converge by id. Reactions / presence / ready-check
+// are ephemeral and are NOT logged.
+// =========================================================================
+function handlePeerMessage(msg) {
+  if (!msg || typeof msg !== 'object') return;
+
+  if (msg.kind === 'hello') {
+    state.partnerName = msg.fromName || 'Partner';
+    state.partnerUid = msg.from || '';
+    state.lastPongAt = Date.now();
+    updatePartnerPresenceUI();
+    showToast(`${state.partnerName} joined the room 🍿`, 'emerald');
+    // Answer with our own log so the newcomer catches up.
+    sendPeerMessage({ kind: 'log-lines', from: state.userId, fromName: state.userName, at: Date.now(), lines: state.logLines });
+    return;
+  }
+
+  if (msg.kind === 'log-lines') {
+    const added = mergeLogLines(msg.lines || []);
+    if (added > 0) {
+      replayLog();
+      renderAllFromLog();
+    }
+    return;
+  }
+
+  if (msg.kind === 'log-line') {
+    if (mergeLogLines([msg.line]) > 0) {
+      const prevMedia = state.roomData.media;
+      replayLog();
+      handleIncomingLogLine(msg.line, prevMedia);
+      renderAllFromLog();
+    }
+    return;
+  }
+
+  if (msg.kind === 'snapshot') {
+    if (msg.media && msg.media.updatedAt && (!state.roomData.media || msg.media.updatedAt > (state.roomData.media.updatedAt || 0))) {
+      const prevMedia = state.roomData.media;
+      state.roomData.media = msg.media;
+      handleIncomingMediaUpdate(msg.media, prevMedia);
+    }
+    if (msg.playback) {
+      applyRemotePlaybackState(msg.playback, false);
+    }
+    return;
+  }
+
+  if (msg.kind === 'reaction') {
+    spawnFloatingReaction(msg.emoji, msg.fromName, Boolean(msg.isLovePulse));
+    if (msg.isLovePulse) triggerLovePulseEffect(msg.fromName);
+    return;
+  }
+
+  if (msg.kind === 'ready-start') {
+    state.readyCheck = {
+      active: true,
+      startedBy: msg.fromName || 'Your partner',
+      startedByUid: msg.from || '',
+      readyUsers: {},
+      countdownStartAt: null
+    };
+    if (msg.from) state.readyCheck.readyUsers[msg.from] = true;
+    showReadyPrompt();
+    return;
+  }
+
+  if (msg.kind === 'ready-confirm') {
+    if (!state.readyCheck.active) return;
+    if (msg.from) state.readyCheck.readyUsers[msg.from] = true;
+    showReadyPrompt();
+    // Only the host decides when the countdown starts.
+    if (state.isHost) maybeStartCountdown();
+    return;
+  }
+
+  if (msg.kind === 'ready-cancel') {
+    hideReadyCheck();
+    return;
+  }
+
+  if (msg.kind === 'countdown-start') {
+    if (state.activeCountdownStartAt !== msg.countdownStartAt) {
+      state.activeCountdownStartAt = msg.countdownStartAt;
+      state.readyCheck.countdownStartAt = msg.countdownStartAt;
+      runLocalCountdownSequence(msg.countdownStartAt);
+    }
+    return;
+  }
+
+  if (msg.kind === 'ping') {
+    sendPeerMessage({ kind: 'pong', from: state.userId, fromName: state.userName, at: Date.now() });
+    state.lastPongAt = Date.now();
+    return;
+  }
+
+  if (msg.kind === 'pong') {
+    state.lastPongAt = Date.now();
+    updatePartnerPresenceUI();
+    return;
+  }
+
+  if (msg.kind === 'resync-request') {
+    sendPeerMessage({ kind: 'log-lines', from: state.userId, fromName: state.userName, at: Date.now(), lines: state.logLines });
+    sendPeerMessage({ kind: 'snapshot', from: state.userId, fromName: state.userName, at: Date.now(), media: state.roomData.media, playback: state.roomData.playback });
+    return;
+  }
+}
+
+// Apply one merged log line to the live UI (playback + media only —
+// whispers / ratings / passport are rendered by renderAllFromLog).
+function handleIncomingLogLine(line, prevMedia) {
+  if (!line) return;
+  if (line.type === 'media') {
+    handleIncomingMediaUpdate(state.roomData.media, prevMedia);
+  } else if (line.type === 'playback') {
+    applyRemotePlaybackState(state.roomData.playback, false);
+  }
+}
+
+// =========================================================================
+// 6. PARTNER PRESENCE & HEARTBEATS
+// =========================================================================
+function updatePartnerPresenceUI() {
+  const now = Date.now();
+  const away = state.peerConnected && state.lastPongAt && (now - state.lastPongAt > 45000);
+  if (state.peerConnected && state.partnerName && !away) {
+    dom.presenceBadge.className = 'flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/15 border border-emerald-500/35 text-xs font-medium text-emerald-200';
+    dom.presenceDot.className = 'w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse';
+    dom.presenceText.textContent = `Watching with ${state.partnerName}`;
+  } else if (state.peerConnected && state.partnerName && away) {
+    dom.presenceBadge.className = 'flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/25 text-xs font-medium text-amber-200';
+    dom.presenceDot.className = 'w-2.5 h-2.5 rounded-full bg-amber-400';
+    dom.presenceText.textContent = `${state.partnerName} stepped away...`;
+  } else {
+    dom.presenceBadge.className = 'flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/25 text-xs font-medium text-amber-200';
+    dom.presenceDot.className = 'w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse';
+    dom.presenceText.textContent = 'Waiting for partner to join...';
+  }
+}
+
+function startHeartbeats() {
+  // Update timeline UI smoothly every 400ms
+  state.playerTickInterval = setInterval(() => {
+    updateTimelineUI();
+  }, 400);
+
+  // Save position every 10s while playing + ping partner every 15s
+  state.positionSaveInterval = setInterval(() => {
+    if (state.mediaType !== 'none' && isPlayerCurrentlyPlaying()) {
+      broadcastPlaybackChange(true, getPlayerCurrentTime(), 'heartbeat');
+    }
+  }, 10000);
+
+  state.presenceHeartbeatInterval = setInterval(() => {
+    if (state.peerConnected) {
+      sendPeerMessage({ kind: 'ping', from: state.userId, fromName: state.userName, at: Date.now() });
+      updatePartnerPresenceUI();
+    }
+  }, 15000);
+}
+
+// =========================================================================
+// 7. YOUTUBE IFRAME API & UNIFIED VIDEO PLAYER CONTROLLER
+// =========================================================================
+function loadYouTubeApiScript() {
+  if (window.YT && window.YT.Player) {
+    state.ytApiReady = true;
+    return;
+  }
+  const tag = document.createElement('script');
+  tag.src = 'https://www.youtube.com/iframe_api';
+  const firstScriptTag = document.getElementsByTagName('script')[0];
+  firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+}
+
+window.onYouTubeIframeAPIReady = function () {
+  state.ytApiReady = true;
+  if (state.pendingYtVideoId) {
+    mountYouTubePlayer(state.pendingYtVideoId);
+    state.pendingYtVideoId = null;
+  }
+};
+
+function mountYouTubePlayer(videoId) {
+  dom.emptyPlayerPlaceholder.classList.add('hidden');
+  dom.html5VideoPlayer.pause();
+  dom.html5VideoPlayer.classList.add('hidden');
+  dom.youtubePlayerWrapper.classList.remove('hidden');
+
+  if (!state.ytApiReady) {
+    state.pendingYtVideoId = videoId;
+    return;
+  }
+
+  if (state.ytPlayer && typeof state.ytPlayer.loadVideoById === 'function') {
+    state.ytPlayer.loadVideoById(videoId);
+    return;
+  }
+
+  state.ytPlayer = new YT.Player('youtubePlayerMount', {
+    videoId: videoId,
+    width: '100%',
+    height: '100%',
+    playerVars: {
+      autoplay: 0,
+      controls: 0,
+      modestbranding: 1,
+      rel: 0,
+      playsinline: 1
+    },
+    events: {
+      onReady: (event) => {
+        const data = event.target.getVideoData();
+        if (data && data.title) {
+          state.mediaTitle = data.title;
+          dom.nowPlayingTitle.textContent = data.title;
+          if (!dom.ratingMovieTitleInput.value) {
+            dom.ratingMovieTitleInput.value = data.title;
+          }
+        }
+        if (state.roomData && state.roomData.playback) {
+          applyRemotePlaybackState(state.roomData.playback, true);
+        }
+      },
+      onStateChange: (event) => {
+        if (state.isRemoteSync) return;
+        if (event.data === YT.PlayerState.PLAYING) {
+          updatePlayButtonUI(true);
+          broadcastPlaybackChange(true, getPlayerCurrentTime());
+        } else if (event.data === YT.PlayerState.PAUSED) {
+          updatePlayButtonUI(false);
+          broadcastPlaybackChange(false, getPlayerCurrentTime());
+        }
+      }
+    }
+  });
+}
+
+function mountHtml5Video(srcUrl, titleLabel) {
+  dom.emptyPlayerPlaceholder.classList.add('hidden');
+  if (state.ytPlayer && typeof state.ytPlayer.pauseVideo === 'function') {
+    try { state.ytPlayer.pauseVideo(); } catch (_) {}
+  }
+  dom.youtubePlayerWrapper.classList.add('hidden');
+  dom.html5VideoPlayer.classList.remove('hidden');
+
+  if (dom.html5VideoPlayer.src !== srcUrl) {
+    dom.html5VideoPlayer.src = srcUrl;
+    dom.html5VideoPlayer.load();
+  }
+
+  state.mediaTitle = titleLabel || 'Movie Stream';
+  dom.nowPlayingBanner.classList.remove('hidden');
+  dom.nowPlayingTitle.textContent = state.mediaTitle;
+  dom.ratingMovieTitleInput.value = state.mediaTitle;
+}
+
+function getPlayerCurrentTime() {
+  if (state.mediaType === 'youtube' && state.ytPlayer && typeof state.ytPlayer.getCurrentTime === 'function') {
+    return state.ytPlayer.getCurrentTime() || 0;
+  }
+  if ((state.mediaType === 'url' || state.mediaType === 'local') && dom.html5VideoPlayer) {
+    return dom.html5VideoPlayer.currentTime || 0;
+  }
+  return 0;
+}
+
+function getPlayerDuration() {
+  if (state.mediaType === 'youtube' && state.ytPlayer && typeof state.ytPlayer.getDuration === 'function') {
+    return state.ytPlayer.getDuration() || 0;
+  }
+  if ((state.mediaType === 'url' || state.mediaType === 'local') && dom.html5VideoPlayer) {
+    return dom.html5VideoPlayer.duration || 0;
+  }
+  return 0;
+}
+
+function isPlayerCurrentlyPlaying() {
+  if (state.mediaType === 'youtube' && state.ytPlayer && typeof state.ytPlayer.getPlayerState === 'function') {
+    return state.ytPlayer.getPlayerState() === YT.PlayerState.PLAYING;
+  }
+  if ((state.mediaType === 'url' || state.mediaType === 'local') && dom.html5VideoPlayer) {
+    return !dom.html5VideoPlayer.paused && !dom.html5VideoPlayer.ended;
+  }
+  return false;
+}
+
+function executeLocalPlay() {
+  if (state.mediaType === 'youtube' && state.ytPlayer && typeof state.ytPlayer.playVideo === 'function') {
+    state.ytPlayer.playVideo();
+  } else if (state.mediaType === 'url' || state.mediaType === 'local') {
+    dom.html5VideoPlayer.play().catch(() => {
+      showToast('Tap Play once to allow browser audio playback 🔊', 'gold');
+    });
+  }
+  updatePlayButtonUI(true);
+}
+
+function executeLocalPause() {
+  if (state.mediaType === 'youtube' && state.ytPlayer && typeof state.ytPlayer.pauseVideo === 'function') {
+    state.ytPlayer.pauseVideo();
+  } else if (state.mediaType === 'url' || state.mediaType === 'local') {
+    dom.html5VideoPlayer.pause();
+  }
+  updatePlayButtonUI(false);
+}
+
+function executeLocalSeek(seconds) {
+  const clamped = Math.max(0, seconds);
+  if (state.mediaType === 'youtube' && state.ytPlayer && typeof state.ytPlayer.seekTo === 'function') {
+    state.ytPlayer.seekTo(clamped, true);
+  } else if (state.mediaType === 'url' || state.mediaType === 'local') {
+    if (Number.isFinite(dom.html5VideoPlayer.duration)) {
+      dom.html5VideoPlayer.currentTime = Math.min(clamped, dom.html5VideoPlayer.duration);
+    } else {
+      dom.html5VideoPlayer.currentTime = clamped;
+    }
+  }
+  updateTimelineUI();
+}
+
+function updatePlayButtonUI(playing) {
+  if (playing) {
+    dom.playIcon.classList.add('hidden');
+    dom.pauseIcon.classList.remove('hidden');
+    dom.playPauseLabel.textContent = 'Pause';
+    dom.ambientGlow.classList.add('is-playing');
+  } else {
+    dom.playIcon.classList.remove('hidden');
+    dom.pauseIcon.classList.add('hidden');
+    dom.playPauseLabel.textContent = 'Play';
+    dom.ambientGlow.classList.remove('is-playing');
+  }
+}
+
+function updateTimelineUI() {
+  const cur = getPlayerCurrentTime();
+  const dur = getPlayerDuration();
+  dom.currentTimeLabel.textContent = formatTime(cur);
+  dom.durationLabel.textContent = formatTime(dur);
+
+  if (dur > 0) {
+    dom.timelineScrubber.max = dur;
+    dom.timelineScrubber.value = cur;
+    const pct = Math.min(100, (cur / dur) * 100);
+    dom.timelineScrubber.style.background = `linear-gradient(to right, #f59e0b ${pct}%, rgba(255,255,255,0.16) ${pct}%)`;
+  }
+}
+
+// HTML5 Video Native Event Listeners
+dom.html5VideoPlayer.addEventListener('play', () => {
+  updatePlayButtonUI(true);
+  if (!state.isRemoteSync) {
+    broadcastPlaybackChange(true, getPlayerCurrentTime());
+  }
+});
+
+dom.html5VideoPlayer.addEventListener('pause', () => {
+  updatePlayButtonUI(false);
+  if (!state.isRemoteSync) {
+    broadcastPlaybackChange(false, getPlayerCurrentTime());
+  }
+});
+
+dom.html5VideoPlayer.addEventListener('loadedmetadata', () => {
+  updateTimelineUI();
+  if (state.roomData && state.roomData.playback) {
+    applyRemotePlaybackState(state.roomData.playback, true);
+  }
+});
+
+// =========================================================================
+// 8. PLAYBACK SYNC WITH ANTI-LOOP PROTECTION
+// Every playback change is BOTH a PeerJS message AND a JSONL log line,
+// so the partner sees it live and tomorrow's replay restores it.
+// =========================================================================
+function engageRemoteSyncLock() {
+  state.isRemoteSync = true;
+  if (state.remoteSyncTimer) clearTimeout(state.remoteSyncTimer);
+  state.remoteSyncTimer = setTimeout(() => {
+    state.isRemoteSync = false;
+  }, 750);
+}
+
+function broadcastPlaybackChange(isPlaying, currentTime, actionLabel = null) {
+  if (!state.roomCode || state.mediaType === 'none') return;
+  const nextSeq = (state.roomData?.playback?.seq || state.lastProcessedSeq || 0) + 1;
+  state.lastProcessedSeq = nextSeq;
+  const line = appendLog('playback', {
+    isPlaying: Boolean(isPlaying),
+    currentTime: Number(currentTime) || 0,
+    actionLabel: actionLabel || (isPlaying ? 'played' : 'paused'),
+    seq: nextSeq
+  });
+  replayLog();
+  sendPeerMessage({ kind: 'log-line', from: state.userId, fromName: state.userName, at: Date.now(), line });
+}
+
+function applyRemotePlaybackState(playback, forceImmediate = false) {
+  if (!playback) return;
+
+  // Ignore our own updates unless forceImmediate (initial load / Re-Sync).
+  if (!forceImmediate && playback.updatedBy === state.userId) {
+    return;
+  }
+
+  if (!forceImmediate && playback.seq && playback.seq <= state.lastProcessedSeq) {
+    return;
+  }
+  if (playback.seq) {
+    state.lastProcessedSeq = playback.seq;
+  }
+
+  engageRemoteSyncLock();
+
+  // Calculate elapsed time since partner triggered update if playing
+  let targetTime = Number(playback.currentTime) || 0;
+  if (playback.isPlaying && playback.updatedAt) {
+    const elapsedSec = Math.max(0, (Date.now() - playback.updatedAt) / 1000);
+    if (elapsedSec < 300) {
+      targetTime += elapsedSec;
+    }
+  }
+
+  const localTime = getPlayerCurrentTime();
+  const drift = Math.abs(localTime - targetTime);
+
+  // Anti-stutter 1.5s drift threshold
+  if (forceImmediate || drift > 1.5) {
+    executeLocalSeek(targetTime);
+  }
+
+  if (playback.isPlaying) {
+    executeLocalPlay();
+  } else {
+    executeLocalPause();
+  }
+
+  // Heartbeats stay silent; real actions get a toast.
+  if (!forceImmediate && playback.updatedByName && playback.actionLabel !== 'heartbeat') {
+    const verb = playback.actionLabel || (playback.isPlaying ? 'played' : 'paused');
+    showToast(`${playback.updatedByName} ${verb} at ${formatTime(targetTime)}`, 'gold');
+  }
+}
+
+// =========================================================================
+// 9. MEDIA SOURCE LOADING
+// =========================================================================
+function handleIncomingMediaUpdate(media, prevMedia) {
+  if (!media || media.type === 'none') return;
+
+  const isNewMedia =
+    !prevMedia ||
+    prevMedia.updatedAt !== media.updatedAt ||
+    prevMedia.url !== media.url ||
+    prevMedia.type !== media.type;
+
+  if (!isNewMedia) return;
+
+  if (media.type === 'local') {
+    if (media.updatedBy !== state.userId && media.localFileName) {
+      dom.partnerLocalFileHint.classList.remove('hidden');
+      dom.partnerLocalFileHint.textContent = `Partner selected local file: "${media.localFileName}" — pick the same file on your device to sync!`;
+      showToast(`${media.updatedByName} loaded local file "${media.localFileName}"`, 'gold');
+      // Switch tab to local file so partner sees it immediately
+      switchSourceTab('local');
+    }
+    return;
+  }
+
+  // Remote URL or YouTube link loaded
+  if (media.type === 'youtube' && media.url) {
+    state.mediaType = 'youtube';
+    state.mediaUrl = media.url;
+    dom.nowPlayingBanner.classList.remove('hidden');
+    dom.nowPlayingTitle.textContent = media.title || 'YouTube Feature';
+    mountYouTubePlayer(media.url);
+    if (media.updatedBy !== state.userId) {
+      showToast(`${media.updatedByName} loaded a YouTube video 🎬`, 'gold');
+    }
+  } else if (media.type === 'url' && media.url) {
+    state.mediaType = 'url';
+    state.mediaUrl = media.url;
+    mountHtml5Video(media.url, media.title || 'Shared Video Stream');
+    if (media.updatedBy !== state.userId) {
+      showToast(`${media.updatedByName} loaded "${media.title || 'a video'}" 🎬`, 'gold');
+    }
+  }
+}
+
+function syncMediaToRoom(type, url, title, localFileName = '') {
+  if (!state.roomCode) return;
+  const line = appendLog('media', {
+    type,
+    url,
+    title,
+    localFileName,
+    actionLabel: 'loaded new video'
+  });
+  replayLog();
+  // Loading a new video resets playback to the start, paused.
+  const pbLine = appendLog('playback', {
+    isPlaying: false,
+    currentTime: 0,
+    actionLabel: 'loaded new video',
+    seq: (state.roomData?.playback?.seq || state.lastProcessedSeq || 0) + 1
+  });
+  state.lastProcessedSeq = pbLine.data.seq;
+  replayLog();
+  sendPeerMessage({ kind: 'log-line', from: state.userId, fromName: state.userName, at: Date.now(), line });
+  sendPeerMessage({ kind: 'log-line', from: state.userId, fromName: state.userName, at: Date.now(), line: pbLine });
+}
+
+// Source Tab Switcher
+function switchSourceTab(tabKey) {
+  document.querySelectorAll('.source-tab-btn').forEach((btn) => {
+    const active = btn.dataset.sourceTab === tabKey;
+    btn.className = active
+      ? 'source-tab-btn flex-1 sm:flex-initial px-3 py-2 rounded-lg text-xs font-semibold transition bg-amber-500 text-obsidian cursor-pointer'
+      : 'source-tab-btn flex-1 sm:flex-initial px-3 py-2 rounded-lg text-xs font-semibold transition text-gray-300 hover:text-white cursor-pointer';
+  });
+  document.querySelectorAll('.source-tab-panel').forEach((panel) => {
+    panel.classList.toggle('hidden', panel.id !== `tabPanel-${tabKey}`);
+  });
+}
+
+// =========================================================================
+// 10. ROOM CREATION & JOINING (no backend — the room lives on PeerJS +
+// the JSONL log; the code is the address AND the save key)
+// =========================================================================
+function enterTheaterUI(code) {
+  state.roomCode = code;
+  window.location.hash = `room=${code}`;
+  dom.roomCodeBadge.textContent = code;
+  dom.headerUserName.textContent = state.userName;
+
+  dom.welcomeView.classList.add('hidden');
+  dom.theaterView.classList.remove('hidden');
+
+  // Replay this room's memories instantly — the screen is never empty.
+  loadLog();
+  // Memories loaded from a .jsonl file on the welcome screen join the log.
+  if (state.pendingImportLines.length) {
+    mergeLogLines(state.pendingImportLines);
+    state.pendingImportLines = [];
+  }
+  replayLog();
+  renderStarSelector();
+  renderAllFromLog();
+  if (state.roomData.playback) {
+    applyRemotePlaybackState(state.roomData.playback, true);
+  }
+  updatePartnerPresenceUI();
+
+  setupPeer();
+  startHeartbeats();
+}
+
+function handleCreateRoom() {
+  const name = dom.userNameInput.value.trim();
+  if (!name) {
+    showToast('Please enter your name first ✨', 'rose');
+    dom.userNameInput.focus();
+    return;
+  }
+  state.userName = name;
+  try { localStorage.setItem('c2t-user-name', name); } catch (_) {}
+
+  const code = generateRoomCode();
+  enterTheaterUI(code);
+  showToast(`Private Room ${code} created! Copy invite link for your partner 🎟️`, 'emerald');
+}
+
+function handleJoinRoom() {
+  const name = dom.userNameInput.value.trim();
+  const code = dom.joinCodeInput.value.trim().toUpperCase();
+
+  if (!name) {
+    showToast('Please enter your name first ✨', 'rose');
+    dom.userNameInput.focus();
+    return;
+  }
+  if (code.length < 4) {
+    showToast('Enter a valid 6-character Room Code', 'rose');
+    dom.joinCodeInput.focus();
+    return;
+  }
+
+  state.userName = name;
+  try { localStorage.setItem('c2t-user-name', name); } catch (_) {}
+
+  enterTheaterUI(code);
+  showToast(`Joined screening room ${code} 🍿`, 'emerald');
+}
+
+// Save one last position line before the page closes or the room is left.
+function saveFinalPosition() {
+  if (!state.roomCode || state.mediaType === 'none') return;
+  try {
+    broadcastPlaybackChange(isPlayerCurrentlyPlaying(), getPlayerCurrentTime(), 'paused');
+  } catch (_) {}
+}
+
+// =========================================================================
+// 11. 3-2-1 READY CHECK & SYNCHRONIZED COUNTDOWN (PeerJS messages;
+// the host decides when both are ready and the countdown starts)
+// =========================================================================
+function showReadyPrompt() {
+  dom.readyCheckOverlay.classList.remove('hidden');
+  dom.readyPromptBox.classList.remove('hidden');
+  dom.countdownBox.classList.add('hidden');
+  dom.readyStartedByText.textContent = `${state.readyCheck.startedBy || 'Your partner'} started a 3-2-1 Ready Check!`;
+
+  const readyMap = state.readyCheck.readyUsers || {};
+  const names = [{ uid: state.userId, name: state.userName }];
+  if (state.partnerUid) names.push({ uid: state.partnerUid, name: state.partnerName || 'Partner' });
+  dom.readyStatusList.innerHTML = names
+    .map((p) => {
+      const isReady = Boolean(readyMap[p.uid]);
+      return `
+        <span class="px-3 py-1.5 rounded-full text-xs font-medium border ${
+          isReady
+            ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-200'
+            : 'bg-white/5 border-white/15 text-gray-400'
+        }">
+          ${escapeHtml(p.name)}: ${isReady ? 'Ready ✓' : 'Waiting...'}
+        </span>
+      `;
+    })
+    .join('');
+
+  const amIReady = Boolean(readyMap[state.userId]);
+  dom.confirmReadyBtn.textContent = amIReady ? 'Waiting for Partner...' : "I'm Ready 🍿";
+  dom.confirmReadyBtn.disabled = amIReady;
+}
+
+function hideReadyCheck() {
+  dom.readyCheckOverlay.classList.add('hidden');
+  dom.readyPromptBox.classList.remove('hidden');
+  dom.countdownBox.classList.add('hidden');
+  state.activeCountdownStartAt = null;
+  if (state.countdownInterval) clearInterval(state.countdownInterval);
+  state.readyCheck = { active: false, startedBy: '', startedByUid: '', readyUsers: {}, countdownStartAt: null };
+}
+
+function maybeStartCountdown() {
+  const neededCount = state.peerConnected ? 2 : 1;
+  const readyCount = Object.keys(state.readyCheck.readyUsers || {}).length;
+  if (readyCount >= neededCount && state.readyCheck.active && !state.readyCheck.countdownStartAt) {
+    const startAt = Date.now();
+    state.readyCheck.countdownStartAt = startAt;
+    sendPeerMessage({ kind: 'countdown-start', from: state.userId, fromName: state.userName, at: Date.now(), countdownStartAt: startAt });
+    state.activeCountdownStartAt = startAt;
+    runLocalCountdownSequence(startAt);
+  }
+}
+
+function triggerReadyCheck() {
+  if (!state.peerConnected) {
+    // Solo / offline: just run the countdown for this device.
+    runLocalCountdownSequence();
+    return;
+  }
+  state.readyCheck = {
+    active: true,
+    startedBy: state.userName,
+    startedByUid: state.userId,
+    readyUsers: { [state.userId]: true },
+    countdownStartAt: null
+  };
+  sendPeerMessage({ kind: 'ready-start', from: state.userId, fromName: state.userName, at: Date.now() });
+  showReadyPrompt();
+}
+
+function confirmUserReady() {
+  if (!state.readyCheck.active) return;
+  state.readyCheck.readyUsers[state.userId] = true;
+  sendPeerMessage({ kind: 'ready-confirm', from: state.userId, fromName: state.userName, at: Date.now() });
+  showReadyPrompt();
+  if (state.isHost) {
+    maybeStartCountdown();
+  } else if (!state.peerConnected) {
+    runLocalCountdownSequence();
+  }
+}
+
+function cancelReadyCheck() {
+  sendPeerMessage({ kind: 'ready-cancel', from: state.userId, fromName: state.userName, at: Date.now() });
+  hideReadyCheck();
+}
+
+function runLocalCountdownSequence(startTimestamp = Date.now()) {
+  dom.readyCheckOverlay.classList.remove('hidden');
+  dom.readyPromptBox.classList.add('hidden');
+  dom.countdownBox.classList.remove('hidden');
+
+  if (state.countdownInterval) clearInterval(state.countdownInterval);
+
+  let step = 3;
+  const renderStep = (val, sub) => {
+    dom.countdownNumber.classList.remove('countdown-digit');
+    void dom.countdownNumber.offsetWidth; // trigger reflow for animation
+    dom.countdownNumber.classList.add('countdown-digit');
+    dom.countdownNumber.textContent = val;
+    dom.countdownSubtext.textContent = sub;
+  };
+
+  renderStep('3', 'Get cozy...');
+
+  state.countdownInterval = setInterval(() => {
+    step -= 1;
+    if (step === 2) {
+      renderStep('2', 'Dim the lights...');
+    } else if (step === 1) {
+      renderStep('1', 'Starting together...');
+    } else if (step === 0) {
+      renderStep('🍿', 'Enjoy the show!');
+      engageRemoteSyncLock();
+      executeLocalPlay();
+    } else {
+      clearInterval(state.countdownInterval);
+      dom.readyCheckOverlay.classList.add('hidden');
+      state.activeCountdownStartAt = null;
+      state.readyCheck = { active: false, startedBy: '', startedByUid: '', readyUsers: {}, countdownStartAt: null };
+      broadcastPlaybackChange(true, getPlayerCurrentTime(), 'started together');
+    }
+  }, 950);
+}
+
+// =========================================================================
+// 12. FLOATING LIVE REACTIONS & THINKING OF YOU PULSE (PeerJS only —
+// reactions are NOT logged; they are for the moment, not the memory)
+// =========================================================================
+function spawnFloatingReaction(emoji, senderName, isLovePulse = false) {
+  const count = isLovePulse ? 5 : 1;
+  for (let i = 0; i < count; i++) {
+    setTimeout(() => {
+      const bubble = document.createElement('div');
+      const leftPercent = isLovePulse ? 15 + Math.random() * 70 : 12 + Math.random() * 76;
+      const sway1 = (Math.random() * 36 - 18).toFixed(0) + 'px';
+      const sway2 = (Math.random() * 44 - 22).toFixed(0) + 'px';
+      const sway3 = (Math.random() * 32 - 16).toFixed(0) + 'px';
+
+      bubble.className = 'floating-reaction flex flex-col items-center';
+      bubble.style.left = `${leftPercent}%`;
+      bubble.style.setProperty('--sway-1', sway1);
+      bubble.style.setProperty('--sway-2', sway2);
+      bubble.style.setProperty('--sway-3', sway3);
+
+      bubble.innerHTML = `
+        <span class="text-3xl sm:text-4xl drop-shadow-[0_4px_12px_rgba(0,0,0,0.65)]">${escapeHtml(emoji)}</span>
+        ${
+          i === 0 && senderName
+            ? `<span class="mt-0.5 px-2 py-0.5 rounded-full bg-black/75 border border-white/15 text-[10px] font-medium text-amber-200 whitespace-nowrap">${escapeHtml(senderName)}</span>`
+            : ''
+        }
+      `;
+
+      dom.floatingReactionsLayer.appendChild(bubble);
+      setTimeout(() => bubble.remove(), 3500);
+    }, i * 160);
+  }
+}
+
+function triggerLovePulseEffect(senderName) {
+  dom.ambientGlow.classList.add('love-pulse');
+  showToast(`💌 ${senderName} is thinking of you!`, 'rose');
+  setTimeout(() => {
+    dom.ambientGlow.classList.remove('love-pulse');
+  }, 2800);
+}
+
+function sendReaction(emoji, isLovePulse = false) {
+  // Spawn immediately locally for zero-latency tactile feel
+  spawnFloatingReaction(emoji, state.userName, isLovePulse);
+  if (isLovePulse) {
+    dom.ambientGlow.classList.add('love-pulse');
+    setTimeout(() => dom.ambientGlow.classList.remove('love-pulse'), 2500);
+  }
+  sendPeerMessage({ kind: 'reaction', from: state.userId, fromName: state.userName, at: Date.now(), emoji, isLovePulse: Boolean(isLovePulse) });
+}
+
+// =========================================================================
+// 13. WHISPER CHAT DRAWER (logged to JSONL, synced live)
+// =========================================================================
+function renderWhisperMessages(messages) {
+  if (!messages.length) {
+    dom.whisperMessagesList.innerHTML = `
+      <div class="text-center text-xs text-gray-500 my-auto py-6">
+        No whispers yet — send a sweet note or timestamped reaction!
+      </div>
+    `;
+    return;
+  }
+
+  if (!state.isWhisperOpen && messages.length > state.lastWhisperCount) {
+    dom.whisperUnreadBadge.classList.remove('hidden');
+  }
+  state.lastWhisperCount = messages.length;
+
+  dom.whisperMessagesList.innerHTML = messages
+    .map((m) => {
+      const isMe = m.senderUid === state.userId;
+      return `
+        <div class="flex flex-col ${isMe ? 'items-end' : 'items-start'}">
+          <div class="flex items-center gap-1.5 mb-0.5 px-1">
+            <span class="text-[10px] font-medium ${isMe ? 'text-amber-300' : 'text-rose-300'}">${escapeHtml(m.senderName)}</span>
+            ${
+              m.movieTimestamp
+                ? `<span class="font-mono text-[9px] px-1.5 py-0.2 rounded bg-white/10 text-gray-300">@ ${escapeHtml(m.movieTimestamp)}</span>`
+                : ''
+            }
+          </div>
+          <div class="max-w-[88%] px-3 py-2 rounded-2xl text-xs leading-relaxed ${
+            isMe
+              ? 'bg-amber-500/20 border border-amber-500/30 text-amber-50 rounded-tr-sm'
+              : 'bg-white/10 border border-white/10 text-gray-100 rounded-tl-sm'
+          }">
+            ${escapeHtml(m.text)}
+          </div>
+        </div>
+      `;
+    })
+    .join('');
+
+  dom.whisperMessagesList.scrollTop = dom.whisperMessagesList.scrollHeight;
+}
+
+function sendWhisperMessage(text) {
+  const clean = text.trim();
+  if (!clean) return;
+
+  const timeTag = state.mediaType !== 'none' ? formatTime(getPlayerCurrentTime()) : '';
+  const line = appendLog('whisper', {
+    text: clean,
+    movieTimestamp: timeTag,
+    senderName: state.userName
+  });
+  replayLog();
+  renderWhisperMessages(state.roomData.whispers);
+  sendPeerMessage({ kind: 'log-line', from: state.userId, fromName: state.userName, at: Date.now(), line });
+}
+
+// =========================================================================
+// 14. TOGETHER MOVIE RATING & SHARED MOVIE PASSPORT (logged to JSONL)
+// =========================================================================
+function renderStarSelector() {
+  dom.myRatingNumeric.textContent = `${state.selectedRating.toFixed(1)} / 5.0 ★`;
+  let html = '';
+  for (let star = 1; star <= 5; star++) {
+    const full = state.selectedRating >= star;
+    const half = !full && state.selectedRating >= star - 0.5;
+    html += `
+      <div class="relative w-8 h-8 flex items-center justify-center select-none">
+        <svg class="w-7 h-7 ${full || half ? 'text-amber-400' : 'text-gray-600'} transition" viewBox="0 0 24 24" fill="currentColor">
+          ${
+            half
+              ? `<defs><linearGradient id="halfGrad${star}"><stop offset="50%" stop-color="#fbbf24"/><stop offset="50%" stop-color="#4b5563"/></linearGradient></defs>
+                 <path fill="url(#halfGrad${star})" d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>`
+              : `<path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>`
+          }
+        </svg>
+        <button type="button" data-star-val="${star - 0.5}" title="${star - 0.5} stars" class="star-half-btn absolute inset-y-0 left-0 w-1/2 cursor-pointer"></button>
+        <button type="button" data-star-val="${star}" title="${star} stars" class="star-half-btn absolute inset-y-0 right-0 w-1/2 cursor-pointer"></button>
+      </div>
+    `;
+  }
+  dom.starSelectorContainer.innerHTML = html;
+
+  dom.starSelectorContainer.querySelectorAll('.star-half-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      state.selectedRating = parseFloat(btn.dataset.starVal);
+      renderStarSelector();
+    });
+  });
+}
+
+function handleSubmitMyRating() {
+  const title = dom.ratingMovieTitleInput.value.trim() || state.mediaTitle || 'Late Night Feature';
+  const note = dom.ratingNoteInput.value.trim();
+  const vibes = Array.from(state.selectedVibes);
+
+  const submission = {
+    uid: state.userId,
+    name: state.userName,
+    score: state.selectedRating,
+    vibes,
+    note,
+    submittedAt: Date.now()
+  };
+  const line = appendLog('rating', { movieTitle: title, submission });
+  replayLog();
+  renderLiveRatingComparison(state.roomData.ratingSession);
+  sendPeerMessage({ kind: 'log-line', from: state.userId, fromName: state.userName, at: Date.now(), line });
+  showToast('Your rating was shared with your partner! ★', 'emerald');
+}
+
+function renderLiveRatingComparison(ratingSession) {
+  if (!ratingSession || !ratingSession.submissions) {
+    dom.liveRatingComparisonBox.classList.add('hidden');
+    return;
+  }
+
+  const subs = Object.values(ratingSession.submissions);
+  if (!subs.length) {
+    dom.liveRatingComparisonBox.classList.add('hidden');
+    return;
+  }
+
+  dom.liveRatingComparisonBox.classList.remove('hidden');
+
+  if (ratingSession.movieTitle && !dom.ratingMovieTitleInput.value) {
+    dom.ratingMovieTitleInput.value = ratingSession.movieTitle;
+  }
+
+  const avg = subs.reduce((acc, s) => acc + Number(s.score || 0), 0) / subs.length;
+  dom.coupleAverageBadge.textContent = `${avg.toFixed(2)} ★ Avg`;
+
+  dom.sideBySideRatingsGrid.innerHTML = subs
+    .map(
+      (s) => `
+      <div class="p-2.5 rounded-xl bg-white/5 border border-white/10 space-y-1">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-semibold text-white truncate">${escapeHtml(s.name)}</span>
+          <span class="font-mono text-xs font-bold text-amber-400">${Number(s.score).toFixed(1)} ★</span>
+        </div>
+        ${
+          s.note
+            ? `<p class="text-[11px] text-gray-300 italic line-clamp-2">"${escapeHtml(s.note)}"</p>`
+            : `<p class="text-[10px] text-gray-500">No note added</p>`
+        }
+      </div>
+    `
+    )
+    .join('');
+}
+
+function handleStampPassport() {
+  const session = state.roomData.ratingSession;
+  const subs = Object.values(session.submissions || {});
+  if (!subs.length) {
+    showToast('Submit at least one rating before stamping!', 'rose');
+    return;
+  }
+
+  const title = dom.ratingMovieTitleInput.value.trim() || session.movieTitle || 'Untitled Feature';
+  const avg = subs.reduce((acc, s) => acc + Number(s.score || 0), 0) / subs.length;
+  const combinedVibes = Array.from(new Set(subs.flatMap((s) => s.vibes || [])));
+
+  const entry = {
+    id: genId(12),
+    movieTitle: title,
+    coupleAverage: Number(avg.toFixed(2)),
+    ratings: subs,
+    vibes: combinedVibes,
+    watchedDate: new Date().toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    }),
+    createdAt: Date.now()
+  };
+
+  const line = appendLog('passport', { entry });
+  replayLog();
+  renderPassportTimeline(state.roomData.passport);
+  sendPeerMessage({ kind: 'log-line', from: state.userId, fromName: state.userName, at: Date.now(), line });
+
+  // The rating session is spent: clear it (logged, so replay agrees).
+  const clearLine = appendLog('rating-clear', {});
+  replayLog();
+  renderLiveRatingComparison(state.roomData.ratingSession);
+  sendPeerMessage({ kind: 'log-line', from: state.userId, fromName: state.userName, at: Date.now(), line: clearLine });
+
+  dom.rateMoviePanel.classList.add('hidden');
+  dom.ratingNoteInput.value = '';
+  showToast(`"${title}" stamped into your Shared Movie Passport! 🛂✨`, 'emerald');
+}
+
+function renderPassportTimeline(entries) {
+  dom.passportCountBadge.textContent = `${entries.length} ${entries.length === 1 ? 'film' : 'films'}`;
+
+  if (!entries.length) {
+    dom.passportTimelineList.innerHTML = `
+      <div class="rounded-xl border border-dashed border-white/10 p-4 text-center text-xs text-gray-500">
+        Your passport is ready for its first stamp! Tap <strong class="text-amber-400">★ Rate Movie Together</strong> after watching.
+      </div>
+    `;
+    return;
+  }
+
+  dom.passportTimelineList.innerHTML = entries
+    .map((entry) => {
+      const ratingsHtml = (entry.ratings || [])
+        .map(
+          (r) => `
+          <div class="text-[11px] bg-black/40 rounded-lg p-2 border border-white/5">
+            <div class="flex items-center justify-between">
+              <span class="font-semibold text-rose-200">${escapeHtml(r.name)}</span>
+              <span class="font-mono text-amber-400 font-semibold">${Number(r.score).toFixed(1)} ★</span>
+            </div>
+            ${r.note ? `<p class="text-gray-300 italic mt-1">"${escapeHtml(r.note)}"</p>` : ''}
+          </div>
+        `
+        )
+        .join('');
+
+      const vibesHtml = (entry.vibes || [])
+        .map(
+          (v) => `<span class="px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/25 text-[10px] text-amber-300">${escapeHtml(v)}</span>`
+        )
+        .join('');
+
+      return `
+        <article class="passport-stamp rounded-2xl p-3.5 space-y-2.5">
+          <div class="flex items-start justify-between gap-2">
+            <div>
+              <span class="text-[10px] font-mono uppercase tracking-wider text-gray-400">${escapeHtml(entry.watchedDate || '')}</span>
+              <h4 class="font-serif text-base font-bold text-white leading-snug">${escapeHtml(entry.movieTitle)}</h4>
+            </div>
+            <div class="flex items-center gap-1.5 shrink-0">
+              <span class="px-2.5 py-1 rounded-full bg-gradient-to-r from-amber-500/25 to-rose-500/25 border border-amber-400/40 font-mono text-xs font-bold text-amber-300">
+                ${Number(entry.coupleAverage || 0).toFixed(1)} ★
+              </span>
+              <button type="button" data-delete-passport="${entry.id}" title="Remove entry" class="delete-passport-btn p-1 text-gray-500 hover:text-rose-400 transition cursor-pointer">
+                ✕
+              </button>
+            </div>
+          </div>
+
+          ${vibesHtml ? `<div class="flex flex-wrap gap-1">${vibesHtml}</div>` : ''}
+
+          <div class="grid grid-cols-1 gap-1.5">
+            ${ratingsHtml}
+          </div>
+        </article>
+      `;
+    })
+    .join('');
+
+  dom.passportTimelineList.querySelectorAll('.delete-passport-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      handleDeletePassportEntry(btn.dataset.deletePassport);
+    });
+  });
+}
+
+function handleDeletePassportEntry(entryId) {
+  if (!entryId) return;
+  const line = appendLog('passport-delete', { entryId });
+  replayLog();
+  renderPassportTimeline(state.roomData.passport);
+  sendPeerMessage({ kind: 'log-line', from: state.userId, fromName: state.userName, at: Date.now(), line });
+  showToast('Passport entry removed', 'gold');
+}
+
+// =========================================================================
+// 15. JSONL EXPORT / IMPORT — the .jsonl file is the backup and the carrier
+// =========================================================================
+function downloadLog() {
+  if (!state.roomCode) return;
+  const text = logToText(state.logLines);
+  const blob = new Blob([text + (text ? '\n' : '')], { type: 'application/jsonl' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `cinema-for-two-${state.roomCode}-memories.jsonl`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+  showToast(`Downloaded ${state.logLines.length} memory lines (.jsonl) 💾`, 'emerald');
+}
+
+// Parse .jsonl text. Returns { lines, loaded, skipped, room }.
+function parseJsonlText(text) {
+  const lines = [];
+  let skipped = 0;
+  let room = '';
+  (text || '').split('\n').forEach((raw) => {
+    const trimmed = raw.trim();
+    if (!trimmed) return;
+    try {
+      const obj = JSON.parse(trimmed);
+      if (obj && obj.id && obj.type && obj.at) {
+        lines.push(obj);
+        if (!room && obj.room) room = obj.room;
+      } else {
+        skipped++;
+      }
+    } catch (_) {
+      skipped++;
+    }
+  });
+  return { lines, loaded: lines.length, skipped, room };
+}
+
+function importLogText(text, sourceLabel) {
+  const result = parseJsonlText(text);
+  if (!result.loaded) {
+    showToast(`No valid memory lines found in that file (${result.skipped} skipped).`, 'rose');
+    return result;
+  }
+  // Inside a room: only lines for this room join the log.
+  const usable = state.roomCode
+    ? result.lines.filter((l) => !l.room || l.room === state.roomCode)
+    : result.lines;
+  const wrongRoom = result.lines.length - usable.length;
+  const added = mergeLogLines(usable);
+  replayLog();
+  renderAllFromLog();
+  if (state.roomCode && state.peerConnected) {
+    sendPeerMessage({ kind: 'log-lines', from: state.userId, fromName: state.userName, at: Date.now(), lines: state.logLines });
+  }
+  const skippedTotal = result.skipped + wrongRoom;
+  showToast(
+    `Loaded ${added} new memories from ${sourceLabel} (${result.loaded - added} already had, ${skippedTotal} skipped).`,
+    added > 0 ? 'emerald' : 'gold'
+  );
+  return { lines: usable, loaded: added, skipped: skippedTotal, room: result.room };
+}
+
+function handleImportFile(file, sourceLabel) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    // Welcome screen: no room yet — take the room code from the file.
+    if (!state.roomCode) {
+      const result = parseJsonlText(String(reader.result || ''));
+      if (!result.loaded) {
+        showToast(`No valid memory lines found in that file (${result.skipped} skipped).`, 'rose');
+        return;
+      }
+      state.pendingImportLines = result.lines;
+      if (result.room) {
+        dom.joinCodeInput.value = result.room;
+        dom.detectedRoomCodeText.textContent = result.room;
+        dom.inviteDetectedBanner.classList.remove('hidden');
+        dom.welcomeImportStatus.textContent = `${result.loaded} memory lines ready for room ${result.room} — enter your name and tap Join Room.`;
+      } else {
+        dom.welcomeImportStatus.textContent = `${result.loaded} memory lines ready — enter a room code and join to load them.`;
+      }
+      showToast(`Memories file ready: ${result.loaded} lines. Join the room to load them.`, 'emerald');
+      return;
+    }
+    importLogText(String(reader.result || ''), sourceLabel);
+  };
+  reader.onerror = () => showToast('Could not read that file.', 'rose');
+  reader.readAsText(file);
+}
+
+// =========================================================================
+// 16. EVENT LISTENERS & UI BINDINGS
+// =========================================================================
+dom.createRoomBtn.addEventListener('click', handleCreateRoom);
+dom.joinRoomBtn.addEventListener('click', handleJoinRoom);
+
+dom.leaveRoomBtn.addEventListener('click', () => {
+  saveFinalPosition();
+  cleanupPeer();
+  executeLocalPause();
+  dom.theaterView.classList.add('hidden');
+  dom.welcomeView.classList.remove('hidden');
+});
+
+dom.copyInviteBtn.addEventListener('click', () => {
+  const shareUrl = `${window.location.origin}${window.location.pathname}#room=${state.roomCode}`;
+  copyTextSafely(shareUrl);
+});
+
+// Welcome-screen memories import
+dom.welcomeImportBtn.addEventListener('click', () => dom.welcomeImportInput.click());
+dom.welcomeImportInput.addEventListener('change', (e) => {
+  handleImportFile(e.target.files?.[0], 'file');
+  e.target.value = '';
+});
+
+// Passport export / import
+dom.exportLogBtn.addEventListener('click', downloadLog);
+dom.passportImportInput.addEventListener('change', (e) => {
+  handleImportFile(e.target.files?.[0], 'file');
+  e.target.value = '';
+});
+
+// Source tabs
+document.querySelectorAll('.source-tab-btn').forEach((btn) => {
+  btn.addEventListener('click', () => switchSourceTab(btn.dataset.sourceTab));
+});
+
+// Load Video / YouTube URL
+dom.urlLoadForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const rawUrl = dom.videoUrlInput.value.trim();
+  if (!rawUrl) {
+    showToast('Paste a YouTube link or direct video URL first', 'rose');
+    return;
+  }
+
+  const ytId = extractYouTubeId(rawUrl);
+  if (ytId) {
+    state.mediaType = 'youtube';
+    state.mediaUrl = ytId;
+    state.mediaTitle = `YouTube (${ytId})`;
+    dom.nowPlayingBanner.classList.remove('hidden');
+    dom.nowPlayingTitle.textContent = 'Loading YouTube video...';
+    mountYouTubePlayer(ytId);
+    syncMediaToRoom('youtube', ytId, 'YouTube Feature');
+    showToast('YouTube video synced to room 🎬', 'emerald');
+  } else {
+    const cleanTitle = rawUrl.split('/').pop()?.split('?')[0] || 'Shared Video Stream';
+    state.mediaType = 'url';
+    state.mediaUrl = rawUrl;
+    mountHtml5Video(rawUrl, cleanTitle);
+    syncMediaToRoom('url', rawUrl, cleanTitle);
+    showToast('Video URL synced to room 🎬', 'emerald');
+  }
+});
+
+// Load Local Video File
+dom.localFileInput.addEventListener('change', async (e) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+
+  const objectUrl = URL.createObjectURL(file);
+  const cleanMovieName = file.name.replace(/\.[^/.]+$/, '').replace(/[._-]+/g, ' ');
+
+  state.mediaType = 'local';
+  state.mediaUrl = objectUrl;
+  dom.localFileSelectedBadge.classList.remove('hidden');
+  dom.localFileNameDisplay.textContent = file.name;
+
+  mountHtml5Video(objectUrl, cleanMovieName);
+  syncMediaToRoom('local', '', cleanMovieName, file.name);
+  showToast(`Loaded "${file.name}" locally!`, 'emerald');
+});
+
+// Sample Clips
+document.querySelectorAll('.sample-clip-btn').forEach((btn) => {
+  btn.addEventListener('click', async () => {
+    const sampleUrl = btn.dataset.sampleUrl;
+    const sampleTitle = btn.dataset.sampleTitle;
+    state.mediaType = 'url';
+    state.mediaUrl = sampleUrl;
+    mountHtml5Video(sampleUrl, sampleTitle);
+    syncMediaToRoom('url', sampleUrl, sampleTitle);
+    showToast(`Loaded "${sampleTitle}" for both of you! 🍿`, 'emerald');
+  });
+});
+
+// Transport Controls
+dom.playPauseBtn.addEventListener('click', () => {
+  if (state.mediaType === 'none') {
+    showToast('Load a video link, local file, or sample clip first 🎬', 'gold');
+    return;
+  }
+  if (isPlayerCurrentlyPlaying()) {
+    executeLocalPause();
+    broadcastPlaybackChange(false, getPlayerCurrentTime(), 'paused');
+  } else {
+    executeLocalPlay();
+    broadcastPlaybackChange(true, getPlayerCurrentTime(), 'played');
+  }
+});
+
+dom.skipBackBtn.addEventListener('click', () => {
+  if (state.mediaType === 'none') return;
+  const target = Math.max(0, getPlayerCurrentTime() - 10);
+  executeLocalSeek(target);
+  broadcastPlaybackChange(isPlayerCurrentlyPlaying(), target, 'rewound');
+});
+
+dom.skipForwardBtn.addEventListener('click', () => {
+  if (state.mediaType === 'none') return;
+  const target = getPlayerCurrentTime() + 10;
+  executeLocalSeek(target);
+  broadcastPlaybackChange(isPlayerCurrentlyPlaying(), target, 'skipped ahead');
+});
+
+dom.timelineScrubber.addEventListener('change', (e) => {
+  if (state.mediaType === 'none') return;
+  const target = parseFloat(e.target.value) || 0;
+  executeLocalSeek(target);
+  broadcastPlaybackChange(isPlayerCurrentlyPlaying(), target, 'jumped');
+});
+
+dom.muteToggleBtn.addEventListener('click', () => {
+  if (state.mediaType === 'youtube' && state.ytPlayer && typeof state.ytPlayer.isMuted === 'function') {
+    if (state.ytPlayer.isMuted()) {
+      state.ytPlayer.unMute();
+      dom.volOnIcon.classList.remove('hidden');
+      dom.volOffIcon.classList.add('hidden');
+    } else {
+      state.ytPlayer.mute();
+      dom.volOnIcon.classList.add('hidden');
+      dom.volOffIcon.classList.remove('hidden');
+    }
+  } else {
+    dom.html5VideoPlayer.muted = !dom.html5VideoPlayer.muted;
+    dom.volOnIcon.classList.toggle('hidden', dom.html5VideoPlayer.muted);
+    dom.volOffIcon.classList.toggle('hidden', !dom.html5VideoPlayer.muted);
+  }
+});
+
+dom.fullscreenBtn.addEventListener('click', () => {
+  if (!document.fullscreenElement) {
+    dom.playerStage.requestFullscreen?.().catch(() => {});
+  } else {
+    document.exitFullscreen?.().catch(() => {});
+  }
+});
+
+// Ready Check & Re-Sync Now
+dom.startReadyCheckBtn.addEventListener('click', triggerReadyCheck);
+dom.confirmReadyBtn.addEventListener('click', confirmUserReady);
+dom.cancelReadyBtn.addEventListener('click', cancelReadyCheck);
+
+dom.resyncNowBtn.addEventListener('click', () => {
+  if (!state.roomData?.playback) {
+    showToast('Nothing playing to sync yet', 'gold');
+    return;
+  }
+  sendPeerMessage({ kind: 'resync-request', from: state.userId, fromName: state.userName, at: Date.now() });
+  applyRemotePlaybackState(state.roomData.playback, true);
+  showToast('Re-synced to partner timestamp ✨', 'emerald');
+});
+
+// Reactions & Thinking of You
+document.querySelectorAll('.reaction-btn').forEach((btn) => {
+  btn.addEventListener('click', () => sendReaction(btn.dataset.emoji, false));
+});
+
+dom.thinkingOfYouBtn.addEventListener('click', () => {
+  sendReaction('💌', true);
+  showToast('Sent "Thinking of You 💌" to your partner!', 'rose');
+});
+
+// Whisper Chat
+dom.toggleWhisperBtn.addEventListener('click', () => {
+  state.isWhisperOpen = !state.isWhisperOpen;
+  dom.whisperDrawerBody.classList.toggle('hidden', !state.isWhisperOpen);
+  dom.whisperChevron.style.transform = state.isWhisperOpen ? 'rotate(0deg)' : 'rotate(-90deg)';
+  if (state.isWhisperOpen) {
+    dom.whisperUnreadBadge.classList.add('hidden');
+  }
+});
+
+dom.whisperForm.addEventListener('submit', (e) => {
+  e.preventDefault();
+  sendWhisperMessage(dom.whisperInput.value);
+  dom.whisperInput.value = '';
+});
+
+document.querySelectorAll('.quick-whisper-btn').forEach((btn) => {
+  btn.addEventListener('click', () => sendWhisperMessage(btn.dataset.quickWhisper));
+});
+
+// Rating Panel & Vibes
+dom.toggleRatePanelBtn.addEventListener('click', () => {
+  dom.rateMoviePanel.classList.toggle('hidden');
+  if (!dom.ratingMovieTitleInput.value && state.mediaTitle) {
+    dom.ratingMovieTitleInput.value = state.mediaTitle;
+  }
+});
+
+dom.closeRatePanelBtn.addEventListener('click', () => {
+  dom.rateMoviePanel.classList.add('hidden');
+});
+
+document.querySelectorAll('.vibe-tag-btn').forEach((btn) => {
+  const vibe = btn.dataset.vibe;
+  const syncVibeStyle = () => {
+    const active = state.selectedVibes.has(vibe);
+    btn.className = active
+      ? 'vibe-tag-btn px-2.5 py-1 rounded-full text-[11px] border border-amber-400/60 bg-amber-500/20 text-amber-200 font-medium transition cursor-pointer'
+      : 'vibe-tag-btn px-2.5 py-1 rounded-full text-[11px] border border-white/15 bg-white/5 text-gray-300 transition cursor-pointer';
+  };
+  syncVibeStyle();
+  btn.addEventListener('click', () => {
+    if (state.selectedVibes.has(vibe)) {
+      state.selectedVibes.delete(vibe);
+    } else {
+      state.selectedVibes.add(vibe);
+    }
+    syncVibeStyle();
+  });
+});
+
+dom.submitMyRatingBtn.addEventListener('click', handleSubmitMyRating);
+dom.stampPassportBtn.addEventListener('click', handleStampPassport);
+
+// Save one last position when the page is closed or hidden.
+window.addEventListener('pagehide', saveFinalPosition);
+
+// =========================================================================
+// 17. BOOTSTRAP ON LOAD
+// =========================================================================
+window.addEventListener('DOMContentLoaded', () => {
+  initLocalUserId();
+  const invitedCode = parseHashRoomCode();
+  if (invitedCode) {
+    dom.joinCodeInput.value = invitedCode;
+    dom.detectedRoomCodeText.textContent = invitedCode;
+    dom.inviteDetectedBanner.classList.remove('hidden');
+  }
+  dom.authInitStatus.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-400"></span><span class="text-emerald-300/90">Peer-to-peer ready · Memories saved on this device + .jsonl file — no cloud yet</span>`;
+  loadYouTubeApiScript();
+});
+  </script>
+</body>
+</html>
