@@ -869,6 +869,10 @@ const state = {
   playerTickInterval: null,
   positionSaveInterval: null,
   peerRetryInterval: null,
+  peerOpenTimeout: null,
+  peerRegistered: false,
+  syncOffline: false,
+  syncOfflineToastShown: false,
   peer: null,
   peerId: '',
   conn: null,
@@ -901,6 +905,7 @@ const dom = {
   presenceBadge: document.getElementById('presenceBadge'),
   presenceDot: document.getElementById('presenceDot'),
   presenceText: document.getElementById('presenceText'),
+  syncIndicatorText: document.getElementById('syncIndicatorText'),
   roomCodeBadge: document.getElementById('roomCodeBadge'),
   copyInviteBtn: document.getElementById('copyInviteBtn'),
   videoUrlInput: document.getElementById('videoUrlInput'),
@@ -1308,21 +1313,41 @@ function sendPeerMessage(msg) {
 function setupPeer() {
   cleanupPeer();
   if (typeof Peer === 'undefined') {
+    state.syncOffline = true;
+    updateSyncIndicator();
     setPeerOffline('PeerJS library did not load — check your connection and refresh.');
     return;
   }
   const hostId = peerHostId(state.roomCode);
+  state.syncOffline = false;
+  state.syncOfflineToastShown = false;
+  updateSyncIndicator(); // Connecting… until the server answers.
   try {
     state.peer = new Peer(hostId);
   } catch (err) {
     console.error('Peer create error:', err);
+    state.syncOffline = true;
+    updateSyncIndicator();
     setPeerOffline('Could not start live sync — memories still save on this device.');
     return;
   }
+  // If the sync server never answers, say so instead of waiting silently.
+  clearTimeout(state.peerOpenTimeout);
+  state.peerOpenTimeout = setTimeout(() => {
+    if (!state.peerRegistered) {
+      state.syncOffline = true;
+      updateSyncIndicator();
+      setPeerOffline('Live sync couldn\'t connect — the sync server didn\'t answer. Memories still save on this device.');
+    }
+  }, 10000);
   state.peer.on('open', (id) => {
     state.isHost = true;
     state.peerId = id;
+    state.peerRegistered = true;
+    state.syncOffline = false;
+    clearTimeout(state.peerOpenTimeout);
     updatePartnerPresenceUI();
+    updateSyncIndicator();
   });
   state.peer.on('connection', (conn) => {
     attachConn(conn);
@@ -1334,6 +1359,10 @@ function setupPeer() {
       state.peer = new Peer('c2t-guest-' + genId(6));
       state.peer.on('open', () => {
         state.isHost = false;
+        state.peerRegistered = true;
+        state.syncOffline = false;
+        clearTimeout(state.peerOpenTimeout);
+        updateSyncIndicator();
         try {
           state.conn = state.peer.connect(hostId, { reliable: true });
           attachConn(state.conn);
@@ -1346,14 +1375,28 @@ function setupPeer() {
         console.error('Guest peer error:', e2);
         setPeerOffline();
       });
-      state.peer.on('disconnected', () => setPeerOffline());
+      state.peer.on('disconnected', () => {
+        state.peerRegistered = false;
+        updateSyncIndicator();
+        setPeerOffline();
+      });
     } else if (err && (err.type === 'peer-unavailable' || err.type === 'network' || err.type === 'server-error' || err.type === 'socket-error' || err.type === 'socket-closed')) {
-      setPeerOffline();
+      if (err.type !== 'peer-unavailable') {
+        state.syncOffline = true;
+        updateSyncIndicator();
+        setPeerOffline('Live sync couldn\'t connect — the sync server didn\'t answer. Memories still save on this device.');
+      } else {
+        setPeerOffline();
+      }
     } else {
       console.error('Peer error:', err);
     }
   });
-  state.peer.on('disconnected', () => setPeerOffline());
+  state.peer.on('disconnected', () => {
+    state.peerRegistered = false;
+    updateSyncIndicator();
+    setPeerOffline();
+  });
 }
 
 function attachConn(conn) {
@@ -1366,7 +1409,9 @@ function attachConn(conn) {
   conn.on('open', () => {
     state.peerConnected = true;
     state.lastPongAt = Date.now();
+    state.syncOffline = false;
     updatePartnerPresenceUI();
+    updateSyncIndicator();
     // Say hello, then swap full logs so both sides end up identical.
     sendPeerMessage({ kind: 'hello', from: state.userId, fromName: state.userName, at: Date.now() });
     sendPeerMessage({ kind: 'log-lines', from: state.userId, fromName: state.userName, at: Date.now(), lines: state.logLines });
@@ -1380,16 +1425,19 @@ function attachConn(conn) {
     state.partnerName = '';
     state.partnerUid = '';
     updatePartnerPresenceUI();
+    updateSyncIndicator();
   });
   conn.on('error', (err) => {
     console.error('Connection error:', err);
     state.peerConnected = false;
     updatePartnerPresenceUI();
+    updateSyncIndicator();
   });
 }
 
 function cleanupPeer() {
   if (state.peerRetryInterval) { clearInterval(state.peerRetryInterval); state.peerRetryInterval = null; }
+  if (state.peerOpenTimeout) { clearTimeout(state.peerOpenTimeout); state.peerOpenTimeout = null; }
   if (state.presenceHeartbeatInterval) { clearInterval(state.presenceHeartbeatInterval); state.presenceHeartbeatInterval = null; }
   if (state.playerTickInterval) { clearInterval(state.playerTickInterval); state.playerTickInterval = null; }
   if (state.positionSaveInterval) { clearInterval(state.positionSaveInterval); state.positionSaveInterval = null; }
@@ -1399,6 +1447,9 @@ function cleanupPeer() {
   state.conn = null;
   state.peer = null;
   state.peerConnected = false;
+  state.peerRegistered = false;
+  state.syncOffline = false;
+  state.syncOfflineToastShown = false;
   state.isHost = false;
   state.partnerName = '';
   state.partnerUid = '';
@@ -1407,7 +1458,12 @@ function cleanupPeer() {
 function setPeerOffline(note) {
   state.peerConnected = false;
   updatePartnerPresenceUI();
-  if (note) showToast(note, 'rose');
+  updateSyncIndicator();
+  // A failing link must not spam the toast every retry — say it once.
+  if (note && !state.syncOfflineToastShown) {
+    state.syncOfflineToastShown = true;
+    showToast(note, 'rose');
+  }
   // Guest retry: if we are a guest and the host is not there yet, keep
   // trying every 5s while the theater is open.
   if (!state.isHost && state.peer && !state.peer.destroyed && !state.peerRetryInterval) {
@@ -1569,6 +1625,28 @@ function updatePartnerPresenceUI() {
     dom.presenceBadge.className = 'flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/25 text-xs font-medium text-amber-200';
     dom.presenceDot.className = 'w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse';
     dom.presenceText.textContent = 'Waiting for partner to join...';
+  }
+}
+
+// The "Live Synced" pill in the player bar used to be a static label — it
+// said Live Synced even when the sync server never answered, which is how
+// a dead link looked identical to a working one. Now it tells the truth:
+// green when this device is registered with the sync server (or connected
+// to the partner), amber while still connecting, red when the server link
+// is down. The toast (shown once) carries the explanation.
+function updateSyncIndicator() {
+  const el = dom.syncIndicatorText;
+  if (!el) return;
+  const live = state.peerConnected || state.peerRegistered;
+  if (live) {
+    el.className = 'hidden sm:inline-flex items-center gap-1.5 text-[11px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-full';
+    el.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>Live Synced';
+  } else if (state.syncOffline) {
+    el.className = 'hidden sm:inline-flex items-center gap-1.5 text-[11px] text-rose-400 bg-rose-500/10 border border-rose-500/20 px-2.5 py-1 rounded-full';
+    el.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-rose-400"></span>Sync Offline';
+  } else {
+    el.className = 'hidden sm:inline-flex items-center gap-1.5 text-[11px] text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2.5 py-1 rounded-full';
+    el.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>Connecting…';
   }
 }
 
