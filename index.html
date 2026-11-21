@@ -892,6 +892,11 @@ const state = {
   conn: null,
   isHost: false,
   peerConnected: false,
+  debugOn: new URLSearchParams(window.location.search).get('debug') === '1',
+  lastPeerError: '',
+  lastConnError: '',
+  debugEvents: [], // {at, text} — last few sync events, debug panel only
+  debugInterval: null,
   partnerName: '',
   partnerUid: '',
   lastPongAt: 0,
@@ -1360,6 +1365,7 @@ function setupPeer() {
     state.peerRegistered = true;
     state.syncOffline = false;
     clearTimeout(state.peerOpenTimeout);
+    debugLog('peer OPEN as host: ' + id);
     updatePartnerPresenceUI();
     updateSyncIndicator();
   });
@@ -1369,6 +1375,8 @@ function setupPeer() {
   state.peer.on('error', (err) => {
     if (err && err.type === 'unavailable-id') {
       // The room is already hosted (partner is here) — join as a guest.
+      state.lastPeerError = 'unavailable-id (room already hosted — joining as guest)';
+      debugLog('peer error: unavailable-id — joining as guest');
       try { state.peer.destroy(); } catch (_) {}
       state.peer = new Peer('c2t-guest-' + genId(6), { config: { iceServers: ICE_SERVERS } });
       state.peer.on('open', () => {
@@ -1376,6 +1384,7 @@ function setupPeer() {
         state.peerRegistered = true;
         state.syncOffline = false;
         clearTimeout(state.peerOpenTimeout);
+        debugLog('guest peer OPEN (' + state.peer.id + ') — connecting to host ' + hostId);
         updateSyncIndicator();
         try {
           state.conn = state.peer.connect(hostId, { reliable: true });
@@ -1386,15 +1395,20 @@ function setupPeer() {
         }
       });
       state.peer.on('error', (e2) => {
+        state.lastPeerError = 'guest: ' + (e2 && e2.type ? e2.type : String(e2));
+        debugLog('guest peer error: ' + state.lastPeerError);
         console.error('Guest peer error:', e2);
         setPeerOffline();
       });
       state.peer.on('disconnected', () => {
         state.peerRegistered = false;
+        debugLog('guest peer disconnected');
         updateSyncIndicator();
         setPeerOffline();
       });
     } else if (err && (err.type === 'peer-unavailable' || err.type === 'network' || err.type === 'server-error' || err.type === 'socket-error' || err.type === 'socket-closed')) {
+      state.lastPeerError = err.type;
+      debugLog('peer error: ' + err.type);
       if (err.type !== 'peer-unavailable') {
         state.syncOffline = true;
         updateSyncIndicator();
@@ -1403,11 +1417,14 @@ function setupPeer() {
         setPeerOffline();
       }
     } else {
+      state.lastPeerError = err && err.type ? err.type : String(err);
+      debugLog('peer error: ' + state.lastPeerError);
       console.error('Peer error:', err);
     }
   });
   state.peer.on('disconnected', () => {
     state.peerRegistered = false;
+    debugLog('peer disconnected from sync server');
     updateSyncIndicator();
     setPeerOffline();
   });
@@ -1424,6 +1441,7 @@ function attachConn(conn) {
     state.peerConnected = true;
     state.lastPongAt = Date.now();
     state.syncOffline = false;
+    debugLog('DATA CHANNEL OPEN — connected to partner');
     updatePartnerPresenceUI();
     updateSyncIndicator();
     // Say hello, then swap full logs so both sides end up identical.
@@ -1438,10 +1456,13 @@ function attachConn(conn) {
     state.peerConnected = false;
     state.partnerName = '';
     state.partnerUid = '';
+    debugLog('data channel closed');
     updatePartnerPresenceUI();
     updateSyncIndicator();
   });
   conn.on('error', (err) => {
+    state.lastConnError = err && err.type ? err.type : String(err);
+    debugLog('data channel error: ' + state.lastConnError);
     console.error('Connection error:', err);
     state.peerConnected = false;
     updatePartnerPresenceUI();
@@ -1452,6 +1473,7 @@ function attachConn(conn) {
 function cleanupPeer() {
   if (state.peerRetryInterval) { clearInterval(state.peerRetryInterval); state.peerRetryInterval = null; }
   if (state.peerOpenTimeout) { clearTimeout(state.peerOpenTimeout); state.peerOpenTimeout = null; }
+  if (state.debugInterval) { clearInterval(state.debugInterval); state.debugInterval = null; }
   if (state.presenceHeartbeatInterval) { clearInterval(state.presenceHeartbeatInterval); state.presenceHeartbeatInterval = null; }
   if (state.playerTickInterval) { clearInterval(state.playerTickInterval); state.playerTickInterval = null; }
   if (state.positionSaveInterval) { clearInterval(state.positionSaveInterval); state.positionSaveInterval = null; }
@@ -1471,6 +1493,7 @@ function cleanupPeer() {
 
 function setPeerOffline(note) {
   state.peerConnected = false;
+  debugLog('setPeerOffline' + (note ? ': ' + note : ''));
   updatePartnerPresenceUI();
   updateSyncIndicator();
   // A failing link must not spam the toast every retry — say it once.
@@ -1676,6 +1699,47 @@ function updateSyncIndicator() {
     el.className = 'hidden sm:inline-flex items-center gap-1.5 text-[11px] text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2.5 py-1 rounded-full';
     el.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>Connecting…';
   }
+  updateDebugPanel();
+}
+
+// =========================================================================
+// DEBUG PANEL (?debug=1) — on-page sync diagnostics for screenshots.
+// Shows the same values DevTools would: peer id, host/guest, registered,
+// connected, ICE state, last errors, recent sync events. Invisible unless
+// the URL carries ?debug=1, so normal use is untouched.
+// =========================================================================
+// Debug panel element, created on demand (not in the static HTML, so the
+// build's getElementById check does not apply to it).
+let debugPanelEl = null;
+
+function debugLog(text) {
+  if (!state.debugOn) return;
+  const at = new Date().toLocaleTimeString('en-GB', { hour12: false });
+  state.debugEvents.push({ at, text });
+  if (state.debugEvents.length > 8) state.debugEvents.shift();
+  updateDebugPanel();
+}
+
+function updateDebugPanel() {
+  if (!state.debugOn) return;
+  let el = debugPanelEl;
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'debugPanel';
+    el.style.cssText = 'position:fixed;left:8px;right:8px;bottom:8px;z-index:9999;background:rgba(0,0,0,0.88);color:#a7f3d0;font:11px/1.5 monospace;padding:8px 10px;border:1px solid #065f46;border-radius:8px;white-space:pre-wrap;word-break:break-all;';
+    document.body.appendChild(el);
+    debugPanelEl = el;
+    // Also expose live state for anyone with DevTools open.
+    window.__c2t = state;
+  }
+  const ice = (state.conn && state.conn.peerConnection) ? (state.conn.peerConnection.iceConnectionState || '?') : '-';
+  const lines = [
+    `room=${state.roomCode || '-'} user=${state.userName || '-'} peerId=${state.peerId || '-'} role=${state.isHost ? 'HOST' : 'guest'}`,
+    `registered=${state.peerRegistered} connected=${state.peerConnected} syncOffline=${state.syncOffline} ice=${ice}`,
+    `peerErr=${state.lastPeerError || '-'} connErr=${state.lastConnError || '-'}`,
+    ...state.debugEvents.map((e) => `${e.at} ${e.text}`),
+  ];
+  el.textContent = 'SYNC DEBUG\n' + lines.join('\n');
 }
 
 function startHeartbeats() {
@@ -2144,6 +2208,12 @@ function enterTheaterUI(code) {
 
   setupPeer();
   startHeartbeats();
+  // Debug panel (?debug=1): refresh the readout every 2s while in theater.
+  if (state.debugOn) {
+    updateDebugPanel();
+    if (state.debugInterval) clearInterval(state.debugInterval);
+    state.debugInterval = setInterval(updateDebugPanel, 2000);
+  }
 }
 
 function handleCreateRoom() {
