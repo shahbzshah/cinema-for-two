@@ -869,6 +869,7 @@ const state = {
   isRemoteSync: false,
   remoteSyncTimer: null,
   lastProcessedSeq: 0,
+  lastSeqBySender: {}, // highest playback seq seen per sender — seq counters are per-device, never compare across devices
   lastWhisperCount: 0,
   isWhisperOpen: true,
   selectedRating: 4.5,
@@ -1943,7 +1944,7 @@ function engageRemoteSyncLock() {
 
 function broadcastPlaybackChange(isPlaying, currentTime, actionLabel = null) {
   if (!state.roomCode || state.mediaType === 'none') return;
-  const nextSeq = (state.roomData?.playback?.seq || state.lastProcessedSeq || 0) + 1;
+  const nextSeq = Math.max(state.roomData?.playback?.seq || 0, state.lastProcessedSeq || 0) + 1;
   state.lastProcessedSeq = nextSeq;
   const line = appendLog('playback', {
     isPlaying: Boolean(isPlaying),
@@ -1963,11 +1964,21 @@ function applyRemotePlaybackState(playback, forceImmediate = false) {
     return;
   }
 
-  if (!forceImmediate && playback.seq && playback.seq <= state.lastProcessedSeq) {
-    return;
+  // Seq counters are per-device: each side numbers its own lines, so a
+  // partner's seq must only be compared with that partner's previous seq.
+  // Comparing it with our own counter (which our 10s heartbeats keep
+  // advancing) wrongly drops the partner's pause/play as "stale".
+  if (!forceImmediate && playback.seq && playback.updatedBy) {
+    const lastForSender = state.lastSeqBySender[playback.updatedBy] || 0;
+    if (playback.seq <= lastForSender) {
+      return;
+    }
   }
   if (playback.seq) {
     state.lastProcessedSeq = playback.seq;
+    if (playback.updatedBy) {
+      state.lastSeqBySender[playback.updatedBy] = playback.seq;
+    }
   }
 
   engageRemoteSyncLock();
