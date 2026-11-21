@@ -1997,20 +1997,26 @@ function applyRemotePlaybackState(playback, forceImmediate = false) {
 
   engageRemoteSyncLock();
 
-  // Calculate elapsed time since partner triggered update if playing
+  // Calculate elapsed time since partner triggered update if playing.
+  // Cap the catch-up: the sender's clock may differ from ours, and a
+  // large skew must never sling the playhead minutes forward/back.
   let targetTime = Number(playback.currentTime) || 0;
   if (playback.isPlaying && playback.updatedAt) {
-    const elapsedSec = Math.max(0, (Date.now() - playback.updatedAt) / 1000);
-    if (elapsedSec < 300) {
-      targetTime += elapsedSec;
-    }
+    const elapsedSec = Math.min(10, Math.max(0, (Date.now() - playback.updatedAt) / 1000));
+    targetTime += elapsedSec;
   }
 
   const localTime = getPlayerCurrentTime();
   const drift = Math.abs(localTime - targetTime);
 
-  // Anti-stutter 1.5s drift threshold
-  if (forceImmediate || drift > 1.5) {
+  // Anti-stutter 1.5s drift threshold. Heartbeats only say "still
+  // playing" — they must never move the playhead: a heartbeat's timestamp
+  // comes from the partner's clock, so with any clock difference between
+  // the two devices every heartbeat yanks the video and makes it freeze
+  // and re-buffer over and over. Only real actions (play/pause/seek) and
+  // forced re-syncs move the playhead.
+  const isHeartbeat = playback.actionLabel === 'heartbeat';
+  if (forceImmediate || (drift > 1.5 && !isHeartbeat)) {
     executeLocalSeek(targetTime);
   }
 
