@@ -841,6 +841,18 @@
 // =========================================================================
 
 const PEERJS_HOST_PREFIX = 'c2t-';
+// TURN relay (Open Relay Project, free, 20 GB/mo): when a router blocks the
+// direct browser-to-browser link (UDP), the live link goes through this
+// relay over a normal TLS web connection (port 443) instead. Video still
+// streams from YouTube directly — only tiny control messages (play/pause,
+// seek, whispers) go through the relay, so 20 GB/mo is effectively
+// unlimited for two people. Google STUN is kept as well.
+const ICE_SERVERS = [
+  { urls: 'stun:stun.l.google.com:19302' },
+  { urls: 'stun:openrelay.metered.ca:80' },
+  { urls: 'turns:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
+  { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
+];
 const LOG_VERSION = 1;
 
 // =========================================================================
@@ -1324,7 +1336,7 @@ function setupPeer() {
   state.syncOfflineToastShown = false;
   updateSyncIndicator(); // Connecting… until the server answers.
   try {
-    state.peer = new Peer(hostId);
+    state.peer = new Peer(hostId, { config: { iceServers: ICE_SERVERS } });
   } catch (err) {
     console.error('Peer create error:', err);
     state.syncOffline = true;
@@ -1357,7 +1369,7 @@ function setupPeer() {
     if (err && err.type === 'unavailable-id') {
       // The room is already hosted (partner is here) — join as a guest.
       try { state.peer.destroy(); } catch (_) {}
-      state.peer = new Peer('c2t-guest-' + genId(6));
+      state.peer = new Peer('c2t-guest-' + genId(6), { config: { iceServers: ICE_SERVERS } });
       state.peer.on('open', () => {
         state.isHost = false;
         state.peerRegistered = true;
