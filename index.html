@@ -904,6 +904,7 @@ const state = {
   partnerName: '',
   partnerUid: '',
   lastPongAt: 0,
+  lastRemoteApplied: null, // last playback state applied FROM the partner — echoes of it are swallowed, not rebroadcast
   logLines: [], // parsed JSONL log objects, in order
   pendingImportLines: [], // .jsonl lines loaded on the welcome screen, applied on room entry
   readyCheck: { active: false, startedBy: '', startedByUid: '', readyUsers: {}, countdownStartAt: null }
@@ -2138,6 +2139,22 @@ function engageRemoteSyncLock() {
 
 function broadcastPlaybackChange(isPlaying, currentTime, actionLabel = null) {
   if (!state.roomCode || state.mediaType === 'none') return;
+  // Echo guard: when we apply the partner's play/pause, our own player
+  // fires the same event back — YouTube's PLAYING often comes seconds
+  // later, after buffering, long past the 750ms remote-sync lock — and
+  // rebroadcasting it makes the partner seek back to our behind-time.
+  // Swallow a same-state broadcast that matches the last remote-applied
+  // state. Heartbeats are exempt (they keep the snapshot fresh for late
+  // joiners). A real state flip by us clears the guard, so a play pressed
+  // after our own pause is never swallowed.
+  const ra = state.lastRemoteApplied;
+  if (ra && actionLabel !== 'heartbeat' && isPlaying === ra.isPlaying) {
+    const expected = ra.currentTime + (ra.isPlaying ? (Date.now() - ra.at) / 1000 : 0);
+    if (Math.abs(Number(currentTime) - expected) < 3) return;
+  }
+  if (ra && isPlaying !== ra.isPlaying) {
+    state.lastRemoteApplied = null;
+  }
   const nextSeq = Math.max(state.roomData?.playback?.seq || 0, state.lastProcessedSeq || 0) + 1;
   state.lastProcessedSeq = nextSeq;
   const line = appendLog('playback', {
@@ -2188,6 +2205,14 @@ function applyRemotePlaybackState(playback, forceImmediate = false) {
 
   const localTime = getPlayerCurrentTime();
   const drift = Math.abs(localTime - targetTime);
+
+  // Remember what the partner asked for, so our own player's echo of it
+  // (YouTube PLAYING firing after buffering) is swallowed in
+  // broadcastPlaybackChange instead of being sent back. Only genuine
+  // remote applies count — not forced re-syncs of our own state.
+  if (!forceImmediate && playback.updatedBy && playback.updatedBy !== state.userId) {
+    state.lastRemoteApplied = { isPlaying: playback.isPlaying, currentTime: targetTime, at: Date.now() };
+  }
 
   // Anti-stutter 1.5s drift threshold. Heartbeats only say "still
   // playing" — they must never move the playhead: a heartbeat's timestamp
@@ -3063,10 +3088,8 @@ dom.playPauseBtn.addEventListener('click', () => {
   }
   if (isPlayerCurrentlyPlaying()) {
     executeLocalPause();
-    broadcastPlaybackChange(false, getPlayerCurrentTime(), 'paused');
   } else {
     executeLocalPlay();
-    broadcastPlaybackChange(true, getPlayerCurrentTime(), 'played');
   }
 });
 
