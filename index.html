@@ -1432,6 +1432,7 @@ function setupPeer() {
 
 function attachConn(conn) {
   if (!conn) return;
+  debugLog('connection object with ' + (conn.peer || '?') + ' (offer arrived/sent)');
   // Only one partner: replace any previous connection.
   if (state.conn && state.conn !== conn) {
     try { state.conn.close(); } catch (_) {}
