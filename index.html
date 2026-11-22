@@ -945,7 +945,7 @@
 // =========================================================================
 
 const PEERJS_HOST_PREFIX = 'c2t-';
-const APP_VERSION = '2.3.7'; // v2.3.7: PiP self-view shrunk w-16/w-20 -> w-10/w-12 — the ?v=38 portrait fit made it 64x114 and it covered the partner; now ~40x71, a small corner preview (?v=40)
+const APP_VERSION = '2.3.8'; // v2.3.8: echo fix — only the visible partner video plays audio (the hidden one kept playing too, so the partner's voice came out twice); mic noise-suppression/echo-cancellation status (ns/ec) now shows in the ?debug=1 panel (?v=41)
 // ICE servers: Google + Cloudflare STUN for direct links, PeerJS's own
 // TURN (its built-in default, which a custom config otherwise discards)
 // as the relay fallback. Open Relay was dropped 22 Nov 2026: its TLS
@@ -1997,8 +1997,27 @@ function attachRemoteStream(stream) {
   state.remoteStream = stream || null;
   if (dom.loungePartnerVideo) dom.loungePartnerVideo.srcObject = stream || null;
   if (dom.pipPartnerVideo) dom.pipPartnerVideo.srcObject = stream || null;
+  syncPartnerVideoAudio();
   if (stream && !state.inLounge) showPip(true);
   updateLoungeStatus();
+}
+
+// Echo: the lounge tile and the PiP both carry the same remote stream, and
+// a hidden <video> still plays sound — so without this the partner's voice
+// came out of BOTH at once (doubled/echoey). Only the visible one may play.
+function syncPartnerVideoAudio() {
+  if (dom.loungePartnerVideo) dom.loungePartnerVideo.muted = !state.inLounge;
+  if (dom.pipPartnerVideo) dom.pipPartnerVideo.muted = state.inLounge;
+}
+
+// What the browser actually applied to the mic (getSettings reports the
+// real state, not just what was requested) — shown in the ?debug=1 panel.
+function micAudioStatus() {
+  const track = state.localStream ? state.localStream.getAudioTracks()[0] : null;
+  if (!track) return 'mic=off';
+  let s = {};
+  try { s = track.getSettings() || {}; } catch (_) {}
+  return `mic=${state.micOn ? 'on' : 'off'} ns=${s.noiseSuppression ? 'on' : 'off'} ec=${s.echoCancellation ? 'on' : 'off'}`;
 }
 
 function wireMediaConn(call) {
@@ -2551,6 +2570,7 @@ function enterLounge() {
   if (dom.theaterView) dom.theaterView.classList.add('hidden');
   if (dom.passportView) dom.passportView.classList.add('hidden');
   setNavActive('lounge');
+  syncPartnerVideoAudio();
   updateLoungeStatus();
   updateCallButtons();
 }
@@ -2561,6 +2581,7 @@ function exitLoungeToTheater() {
   if (dom.theaterView) dom.theaterView.classList.remove('hidden');
   if (dom.passportView) dom.passportView.classList.add('hidden');
   setNavActive('theater');
+  syncPartnerVideoAudio();
   if (state.remoteStream || state.localStream) showPip(true);
 }
 
@@ -2584,6 +2605,7 @@ function showAppView(view) {
     if (dom.loungeView) dom.loungeView.classList.add('hidden');
     if (dom.theaterView) dom.theaterView.classList.add('hidden');
     if (dom.passportView) dom.passportView.classList.remove('hidden');
+    syncPartnerVideoAudio();
     renderPassportTimeline(state.roomData ? state.roomData.passport : []);
     setNavActive('passport');
     window.scrollTo(0, 0);
@@ -2924,7 +2946,7 @@ function updateDebugPanel() {
     `v=${APP_VERSION} room=${state.roomCode || '-'} user=${state.userName || '-'} peerId=${state.peerId || '-'} role=${state.isHost ? 'HOST' : 'guest'}`,
     `registered=${state.peerRegistered} connected=${state.peerConnected} syncOffline=${state.syncOffline} ice=${ice}`,
     `cands=${cands}`,
-    `call=${state.mediaConn ? (state.remoteStream ? 'live' : 'calling') : 'off'} cam=${state.camOn ? 'on' : 'off'} mic=${state.micOn ? 'on' : 'off'} lounge=${state.inLounge}`,
+    `call=${state.mediaConn ? (state.remoteStream ? 'live' : 'calling') : 'off'} cam=${state.camOn ? 'on' : 'off'} ${micAudioStatus()} lounge=${state.inLounge}`,
     `peerErr=${state.lastPeerError || '-'} connErr=${state.lastConnError || '-'}`,
     ...state.debugEvents.map((e) => `${e.at} ${e.text}`),
   ];
