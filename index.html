@@ -924,7 +924,7 @@
 // =========================================================================
 
 const PEERJS_HOST_PREFIX = 'c2t-';
-const APP_VERSION = '2.1.0'; // v2.1: Stitch reskin (DESIGN.md) — same v2 calling/lounge/PiP, new visual system
+const APP_VERSION = '2.2.0'; // v2.2: Piped redirect — YouTube links resolve to an ad-free direct stream first, YouTube embed on any failure
 // ICE servers: Google + Cloudflare STUN for direct links, PeerJS's own
 // TURN (its built-in default, which a custom config otherwise discards)
 // as the relay fallback. Open Relay was dropped 22 Nov 2026: its TLS
@@ -1222,6 +1222,77 @@ function extractYouTubeId(url) {
     if (match && match[1]) return match[1];
   }
   return null;
+}
+
+// Piped redirect (v2.2): paste a YouTube link and the app first asks a
+// Piped instance for the direct stream, so both sides watch ad-free in
+// the app's own player with sync intact. Any failure falls back to the
+// YouTube embed — never a dead screen.
+const PIPED_API_BASES = [
+  'https://api.piped.private.coffee',
+  'https://pipedapi.kavin.rocks'
+];
+const PIPED_FETCH_TIMEOUT_MS = 8000;
+
+async function fetchJsonWithTimeout(url, timeoutMs) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, { signal: controller.signal });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch (_) {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// Pick the best direct video file from a Piped /streams response:
+// prefer MP4 (plays everywhere), highest quality first. HLS playlists
+// are skipped — plain <video> cannot play them without a library.
+function pickPipedStream(data) {
+  if (!data || !Array.isArray(data.videoStreams)) return null;
+  const direct = data.videoStreams.filter((s) => s && typeof s.url === 'string'
+    && s.url.indexOf('http') === 0 && typeof s.mimeType === 'string'
+    && s.mimeType.indexOf('video/') === 0);
+  if (!direct.length) return null;
+  const mp4 = direct.filter((s) => s.mimeType.indexOf('video/mp4') === 0);
+  const pool = mp4.length ? mp4 : direct;
+  pool.sort((a, b) => (parseInt(String(b.quality || '0'), 10) || 0)
+    - (parseInt(String(a.quality || '0'), 10) || 0));
+  return { streamUrl: pool[0].url, title: (data.title || '').trim() || null };
+}
+
+async function resolveYouTubeViaPiped(videoId) {
+  for (const base of PIPED_API_BASES) {
+    const data = await fetchJsonWithTimeout(base + '/streams/' + videoId, PIPED_FETCH_TIMEOUT_MS);
+    if (data) {
+      const picked = pickPipedStream(data);
+      if (picked) return picked;
+    }
+  }
+  return null;
+}
+
+function waitForPlayable(videoEl, timeoutMs) {
+  if (videoEl.readyState >= 3) return Promise.resolve(true);
+  return new Promise((resolve) => {
+    let done = false;
+    const finish = (ok) => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      videoEl.removeEventListener('canplay', onCanPlay);
+      videoEl.removeEventListener('error', onError);
+      resolve(ok);
+    };
+    const onCanPlay = () => finish(true);
+    const onError = () => finish(false);
+    const timer = setTimeout(() => finish(false), timeoutMs);
+    videoEl.addEventListener('canplay', onCanPlay, { once: true });
+    videoEl.addEventListener('error', onError, { once: true });
+  });
 }
 
 function escapeHtml(str) {
@@ -2435,7 +2506,7 @@ function mountYouTubePlayer(videoId) {
   });
 }
 
-function mountHtml5Video(srcUrl, titleLabel) {
+function mountHtml5Video(srcUrl, titleLabel, onErrorOverride) {
   dom.emptyPlayerPlaceholder.classList.add('hidden');
   if (state.ytPlayer && typeof state.ytPlayer.pauseVideo === 'function') {
     try { state.ytPlayer.pauseVideo(); } catch (_) {}
@@ -2448,17 +2519,56 @@ function mountHtml5Video(srcUrl, titleLabel) {
     dom.html5VideoPlayer.load();
   }
   // A web page pasted as a "video link" fails here — say so plainly
-  // instead of leaving a dead player.
-  dom.html5VideoPlayer.onerror = () => {
-    dom.nowPlayingBanner.classList.remove('hidden');
-    dom.nowPlayingTitle.textContent = 'This link did not play — it may be a web page, not a video file. Paste a YouTube link or a direct .mp4 link.';
-    showToast('This link did not play — it may be a web page, not a video file.', 'rose');
-  };
+  // instead of leaving a dead player. Callers that already handle the
+  // failure themselves (the Piped path) may pass their own handler.
+  if (typeof onErrorOverride === 'function') {
+    dom.html5VideoPlayer.onerror = onErrorOverride;
+  } else {
+    dom.html5VideoPlayer.onerror = () => {
+      dom.nowPlayingBanner.classList.remove('hidden');
+      dom.nowPlayingTitle.textContent = 'This link did not play — it may be a web page, not a video file. Paste a YouTube link or a direct .mp4 link.';
+      showToast('This link did not play — it may be a web page, not a video file.', 'rose');
+    };
+  }
 
   state.mediaTitle = titleLabel || 'Movie Stream';
   dom.nowPlayingBanner.classList.remove('hidden');
   dom.nowPlayingTitle.textContent = state.mediaTitle;
   dom.ratingMovieTitleInput.value = state.mediaTitle;
+}
+
+// Load a YouTube video: try the ad-free Piped stream first, and only
+// sync it to the room once this device confirms it actually plays.
+// If the instance is down or the stream will not play, use the YouTube
+// embed exactly as before — never a dead screen.
+async function loadYouTubeVideo(ytId, titleLabel) {
+  dom.nowPlayingBanner.classList.remove('hidden');
+  dom.nowPlayingTitle.textContent = 'Finding an ad-free stream…';
+  const piped = await resolveYouTubeViaPiped(ytId);
+  if (piped) {
+    const title = piped.title || titleLabel || `YouTube (${ytId})`;
+    state.mediaType = 'url';
+    state.mediaUrl = piped.streamUrl;
+    state.mediaTitle = title;
+    mountHtml5Video(piped.streamUrl, title, () => {
+      dom.nowPlayingBanner.classList.remove('hidden');
+      dom.nowPlayingTitle.textContent = 'The ad-free stream stopped — paste the YouTube link again to retry.';
+    });
+    const playable = await waitForPlayable(dom.html5VideoPlayer, 10000);
+    if (playable) {
+      syncMediaToRoom('url', piped.streamUrl, title);
+      showToast('Playing ad-free for both of you 🎬', 'emerald');
+      return;
+    }
+  }
+  state.mediaType = 'youtube';
+  state.mediaUrl = ytId;
+  state.mediaTitle = `YouTube (${ytId})`;
+  dom.nowPlayingBanner.classList.remove('hidden');
+  dom.nowPlayingTitle.textContent = 'Loading YouTube video...';
+  mountYouTubePlayer(ytId);
+  syncMediaToRoom('youtube', ytId, titleLabel || 'YouTube Feature');
+  showToast('YouTube video synced to room 🎬', 'emerald');
 }
 
 function getPlayerCurrentTime() {
@@ -3550,14 +3660,7 @@ dom.urlLoadForm.addEventListener('submit', async (e) => {
 
   const ytId = extractYouTubeId(rawUrl);
   if (ytId) {
-    state.mediaType = 'youtube';
-    state.mediaUrl = ytId;
-    state.mediaTitle = `YouTube (${ytId})`;
-    dom.nowPlayingBanner.classList.remove('hidden');
-    dom.nowPlayingTitle.textContent = 'Loading YouTube video...';
-    mountYouTubePlayer(ytId);
-    syncMediaToRoom('youtube', ytId, 'YouTube Feature');
-    showToast('YouTube video synced to room 🎬', 'emerald');
+    await loadYouTubeVideo(ytId, 'YouTube Feature');
   } else {
     // Only real video files play in the built-in player. A video PAGE
     // (YouTube link with a bad ID, Pexels/TikTok/Instagram/Facebook page)
@@ -3604,13 +3707,7 @@ document.querySelectorAll('.sample-clip-btn').forEach((btn) => {
     const sampleTitle = btn.dataset.sampleTitle;
     const ytId = extractYouTubeId(sampleUrl);
     if (ytId) {
-      state.mediaType = 'youtube';
-      state.mediaUrl = ytId;
-      state.mediaTitle = sampleTitle;
-      dom.nowPlayingBanner.classList.remove('hidden');
-      dom.nowPlayingTitle.textContent = sampleTitle;
-      mountYouTubePlayer(ytId);
-      syncMediaToRoom('youtube', ytId, sampleTitle);
+      await loadYouTubeVideo(ytId, sampleTitle);
     } else {
       state.mediaType = 'url';
       state.mediaUrl = sampleUrl;
