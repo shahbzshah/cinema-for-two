@@ -971,7 +971,7 @@
 // =========================================================================
 
 const PEERJS_HOST_PREFIX = 'c2t-';
-const APP_VERSION = '2.4.1'; // v2.4.1: universal local formats — .ts/.m2ts/.flv play via mpegts.js, .m3u8 via hls.js, MKV silent-audio (AC3/DTS) is detected and fixed in the browser with FFmpeg.wasm (Fast Fix copies video + AAC audio, Full Convert re-encodes) (?v=44)
+const APP_VERSION = '2.4.2'; // v2.4.2: converter picks the right mode — Fast Fix only copies the video stream, so an .mp4 carrying HEVC inside would "convert" and still not play; the converter now probes the video codec first and switches to Full Convert automatically (?v=45)
 // ICE servers: Google + Cloudflare STUN for direct links, PeerJS's own
 // TURN (its built-in default, which a custom config otherwise discards)
 // as the relay fallback. Open Relay was dropped 22 Nov 2026: its TLS
@@ -3233,6 +3233,17 @@ function detectVideoExtension(nameOrUrl) {
   return clean.slice(dotIdx + 1);
 }
 
+// Pure: which convert mode should actually run? Fast Fix only copies the
+// video stream, so it only works when the video codec already plays in
+// the browser (H.264/VP8/VP9/AV1). Anything else — HEVC, MPEG-4, DivX —
+// needs the full re-encode, whatever button he tapped. Unknown codec
+// defaults to full: a failed copy is worse than a slower convert.
+function convertModeForCodec(videoCodec, requestedMode) {
+  const playable = ['h264', 'vp8', 'vp9', 'av1'].includes((videoCodec || '').toLowerCase());
+  if (requestedMode === 'fast' && playable) return 'fast';
+  return 'full';
+}
+
 // Pure: which playback engine handles this extension?
 // 'mpegts' for .ts/.m2ts/.mts/.flv (MSE demux), 'hls' for .m3u8,
 // 'native' for everything else — MP4/WebM/MKV/MOV/AVI play natively or
@@ -3473,8 +3484,26 @@ async function transcodeLocalFileToMp4(mode = 'fast') {
     const fastArgs = ['-i', inputFileName, '-map', '0:v:0', '-map', '0:a:0?', '-c:v', 'copy', '-c:a', 'aac', '-b:a', '192k', '-movflags', '+faststart', outputFileName];
     const fullArgs = ['-i', inputFileName, '-map', '0:v:0', '-map', '0:a:0?', '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '23', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '192k', '-movflags', '+faststart', outputFileName];
 
-    let exitCode = await ffmpeg.exec(mode === 'fast' ? fastArgs : fullArgs);
-    if (exitCode !== 0 && mode === 'fast') {
+    // Fast Fix only copies the video stream, so it only helps when the
+    // video codec already plays in the browser. An .mp4-named file can
+    // still carry HEVC inside — copying it would "succeed" and hand
+    // back another unplayable file. Probe the codec first and pick the
+    // mode that actually works, whatever button he tapped.
+    const logLines = [];
+    const onLog = ({ message }) => { if (message) logLines.push(message); };
+    ffmpeg.on('log', onLog);
+    try { await ffmpeg.exec(['-i', inputFileName]); } catch (_) {}
+    if (typeof ffmpeg.off === 'function') { try { ffmpeg.off('log', onLog); } catch (_) {} }
+    const codecMatch = logLines.join('\n').match(/Stream #\d+:\d+.*Video:\s*([a-z0-9_]+)/i);
+    const videoCodec = codecMatch ? codecMatch[1].toLowerCase() : '';
+    const effectiveMode = convertModeForCodec(videoCodec, mode);
+    if (effectiveMode !== mode) {
+      dom.transcodeTitle.textContent = 'Video Codec Needs Full Conversion...';
+      dom.transcodeSubtitle.textContent = 'This file uses ' + (videoCodec || 'an unsupported') + ' video — converting it to H.264 + AAC MP4...';
+    }
+
+    let exitCode = await ffmpeg.exec(effectiveMode === 'fast' ? fastArgs : fullArgs);
+    if (exitCode !== 0 && effectiveMode === 'fast') {
       // The video codec could not be copied into MP4 — escalate to a
       // full H.264/AAC transcode instead of failing.
       dom.transcodeTitle.textContent = 'Video Codec Needs Full Conversion...';
