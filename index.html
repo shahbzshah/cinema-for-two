@@ -1,255 +1,263 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>Cinema for Two — Private Screening Room</title>
-
-  <!-- Tailwind CSS -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23161310'/%3E%3Cpath d='M26 20l18 12-18 12z' fill='%23E8A33D'/%3E%3C/svg%3E">
-
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23161310'/%3E%3Cpath d='M26 20l18 12-18 12z' fill='%23E8A33D'/%3E%3C/svg%3E" />
   <!-- PeerJS 1.5.4: browser-to-browser live sync, no backend -->
   <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
-
-  <!-- Google Fonts: Playfair Display, Inter & JetBrains Mono -->
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:ital,wght@0,600;0,700;1,500&display=swap" rel="stylesheet" />
-
-  <script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script id="tailwind-config">
+    // Design tokens from DESIGN.md (Stitch system). Fonts are self-hosted
+    // under fonts/ — no Google Fonts CDN (Brave mobile blocks it).
     tailwind.config = {
-      darkMode: 'class',
+      darkMode: "class",
       theme: {
         extend: {
-          fontFamily: {
-            sans: ['Inter', 'sans-serif'],
-            serif: ['Playfair Display', 'serif'],
-            mono: ['JetBrains Mono', 'monospace'],
-          },
           colors: {
-            obsidian: '#0a0c12',
-            velvet: '#121622',
-            gold: {
-              400: '#fbbf24',
-              500: '#f59e0b',
-              600: '#d97706',
-            },
-            rose: {
-              400: '#fb7185',
-              500: '#f43f5e',
-              600: '#e11d48',
-            }
+            "inverse-on-surface": "#313032",
+            "on-primary-fixed": "#281900",
+            "text-muted": "#5E5D59",
+            "background": "#131315",
+            "inverse-primary": "#7e5700",
+            "surface-container": "#201f21",
+            "inverse-surface": "#e5e1e4",
+            "surface-card": "#141417",
+            "on-error-container": "#ffdad6",
+            "secondary-fixed-dim": "#c8c5cc",
+            "surface": "#131315",
+            "primary-container": "#e5a93c",
+            "secondary-container": "#47464c",
+            "surface-container-highest": "#353437",
+            "text-secondary": "#9A9891",
+            "on-tertiary-fixed": "#001d36",
+            "error": "#ffb4ab",
+            "tertiary-container": "#79b8fe",
+            "error-container": "#93000a",
+            "on-secondary-container": "#b6b4bb",
+            "on-tertiary-container": "#00487b",
+            "on-surface-variant": "#d4c4b0",
+            "on-secondary-fixed": "#1b1b20",
+            "outline": "#9d8f7c",
+            "on-tertiary": "#003258",
+            "surface-container-low": "#1b1b1d",
+            "surface-tint": "#fabc4d",
+            "surface-container-high": "#2a2a2c",
+            "primary-fixed-dim": "#fabc4d",
+            "on-primary": "#432c00",
+            "presence-indicator": "#4ADE80",
+            "on-error": "#690005",
+            "tertiary-fixed-dim": "#9ecaff",
+            "on-primary-fixed-variant": "#604100",
+            "on-background": "#e5e1e4",
+            "surface-dim": "#131315",
+            "outline-variant": "#504535",
+            "surface-container-lowest": "#0e0e10",
+            "secondary-fixed": "#e4e1e8",
+            "primary-fixed": "#ffdead",
+            "on-secondary": "#303035",
+            "primary": "#ffc665",
+            "tertiary-fixed": "#d1e4ff",
+            "secondary": "#c8c5cc",
+            "canvas-background": "#0C0C0E",
+            "on-tertiary-fixed-variant": "#00497d",
+            "surface-variant": "#353437",
+            "on-surface": "#e5e1e4",
+            "on-secondary-fixed-variant": "#47464c",
+            "surface-bright": "#39393b",
+            "hairline-border": "rgba(255, 255, 255, 0.08)",
+            "tertiary": "#afd2ff",
+            "text-primary": "#F4F3EF",
+            "on-primary-container": "#5e4000",
+            "surface-control": "#1C1C21"
+          },
+          borderRadius: { "DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem" },
+          spacing: {
+            "gutter": "1rem",
+            "margin-desktop": "2.5rem",
+            "space-lg": "1.5rem",
+            "space-sm": "0.5rem",
+            "margin": "1rem",
+            "gutter-desktop": "1.5rem",
+            "space-md": "1rem",
+            "space-xl": "2.5rem",
+            "space-xs": "0.25rem"
+          },
+          fontFamily: {
+            "label-sm": ["JetBrains Mono", "ui-monospace", "monospace"],
+            "headline-md": ["Newsreader", "Georgia", "serif"],
+            "display-lg": ["Newsreader", "Georgia", "serif"],
+            "display-lg-mobile": ["Newsreader", "Georgia", "serif"],
+            "title-sm": ["Plus Jakarta Sans", "system-ui", "sans-serif"],
+            "body-md": ["Plus Jakarta Sans", "system-ui", "sans-serif"],
+            "body-sm": ["Plus Jakarta Sans", "system-ui", "sans-serif"],
+            "label-md": ["JetBrains Mono", "ui-monospace", "monospace"],
+            "code-timecode": ["JetBrains Mono", "ui-monospace", "monospace"]
+          },
+          fontSize: {
+            "label-sm": ["12px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "400" }],
+            "headline-md": ["24px", { "lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "400" }],
+            "display-lg": ["36px", { "lineHeight": "44px", "letterSpacing": "-0.02em", "fontWeight": "400" }],
+            "display-lg-mobile": ["28px", { "lineHeight": "36px", "letterSpacing": "-0.02em", "fontWeight": "400" }],
+            "title-sm": ["15px", { "lineHeight": "22px", "letterSpacing": "0em", "fontWeight": "500" }],
+            "body-md": ["14px", { "lineHeight": "20px", "letterSpacing": "0em", "fontWeight": "400" }],
+            "body-sm": ["13px", { "lineHeight": "18px", "letterSpacing": "0em", "fontWeight": "400" }],
+            "label-md": ["13px", { "lineHeight": "18px", "letterSpacing": "0.04em", "fontWeight": "500" }],
+            "code-timecode": ["12px", { "lineHeight": "16px", "letterSpacing": "0.02em", "fontWeight": "500" }]
           }
         }
       }
     };
   </script>
-
   <style>
-    :root {
-      --bg-obsidian: #0a0c12;
-      --accent-gold: #f59e0b;
-      --accent-rose: #f43f5e;
+    /* Self-hosted fonts (fonts/ in the publish repo). No Google Fonts CDN. */
+    @font-face { font-family: "Newsreader"; font-style: normal; font-weight: 400; font-display: swap; src: url("fonts/newsreader-400.woff2") format("woff2"); }
+    @font-face { font-family: "Newsreader"; font-style: italic; font-weight: 400; font-display: swap; src: url("fonts/newsreader-400-italic.woff2") format("woff2"); }
+    @font-face { font-family: "Plus Jakarta Sans"; font-style: normal; font-weight: 400; font-display: swap; src: url("fonts/jakarta-400.woff2") format("woff2"); }
+    @font-face { font-family: "Plus Jakarta Sans"; font-style: normal; font-weight: 500; font-display: swap; src: url("fonts/jakarta-500.woff2") format("woff2"); }
+    @font-face { font-family: "JetBrains Mono"; font-style: normal; font-weight: 400; font-display: swap; src: url("fonts/jetbrains-400.woff2") format("woff2"); }
+    @font-face { font-family: "JetBrains Mono"; font-style: normal; font-weight: 500; font-display: swap; src: url("fonts/jetbrains-500.woff2") format("woff2"); }
+    /* Material Symbols Outlined, subset to the icons this app uses (see the
+       icon map comment at the top of the body). Icons are PUA codepoints,
+       e.g. &#xE037; = play_arrow. The subset keeps the variable axes
+       (opsz/wght/FILL/GRAD) so FILL 1 still works for .mso-filled. */
+    @font-face { font-family: "Material Symbols Outlined"; font-style: normal; font-weight: 100 700; font-display: swap; src: url("fonts/material-symbols-outlined.woff2") format("woff2"); }
+    .material-symbols-outlined {
+      font-family: "Material Symbols Outlined";
+      font-weight: normal;
+      font-style: normal;
+      font-size: 24px;
+      line-height: 1;
+      letter-spacing: normal;
+      text-transform: none;
+      display: inline-block;
+      white-space: nowrap;
+      word-wrap: normal;
+      direction: ltr;
+      -webkit-font-smoothing: antialiased;
+      font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24;
     }
+    .material-symbols-outlined.mso-filled { font-variation-settings: "FILL" 1, "wght" 400, "GRAD" 0, "opsz" 24; }
+    .material-symbols-outlined.mso-thin { font-variation-settings: "FILL" 0, "wght" 300, "GRAD" 0, "opsz" 24; }
 
-    * {
-      box-sizing: border-box;
-      -webkit-tap-highlight-color: transparent;
-    }
+    html, body { margin: 0; padding: 0; }
+    body { overscroll-behavior: none; }
+    ::-webkit-scrollbar { display: none; }
 
-    body {
-      background-color: var(--bg-obsidian);
-      color: #f3f4f6;
-      font-family: 'Inter', sans-serif;
-      overflow-x: hidden;
-      min-height: 100vh;
-      background-image:
-        radial-gradient(circle at 18% 12%, rgba(245, 158, 11, 0.08), transparent 42%),
-        radial-gradient(circle at 85% 25%, rgba(244, 63, 94, 0.08), transparent 45%),
-        radial-gradient(circle at 50% 90%, rgba(245, 158, 11, 0.05), transparent 50%);
-    }
-
-    /* Glassmorphism Velvet Cards */
-    .glass-card {
-      background: rgba(17, 21, 33, 0.78);
-      backdrop-filter: blur(18px);
-      -webkit-backdrop-filter: blur(18px);
-      border: 1px solid rgba(245, 158, 11, 0.16);
-      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.05);
-    }
-
-    .glass-subtle {
-      background: rgba(255, 255, 255, 0.03);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-    }
-
-    /* Ambient Cinema Screen Glow */
-    .cinema-stage-wrapper {
-      position: relative;
-    }
+    /* Quiet hairline behind the player stage. The design law is zero
+       colored glows and zero drop shadows, so the old amber radial glow
+       is a 1px hairline that warms slightly while playing and flashes
+       on a Thinking of You pulse. app.js toggles .is-playing/.love-pulse. */
     .cinema-ambient-glow {
-      position: absolute;
-      inset: -14px;
-      border-radius: 28px;
-      background: linear-gradient(125deg, rgba(245, 158, 11, 0.24), rgba(244, 63, 94, 0.18), rgba(245, 158, 11, 0.22));
-      filter: blur(28px);
-      opacity: 0.65;
-      z-index: 0;
-      transition: opacity 0.6s ease, transform 0.6s ease;
-      pointer-events: none;
+      position: absolute; inset: -1px; border-radius: 10px;
+      border: 1px solid rgba(229, 169, 60, 0);
+      pointer-events: none; transition: border-color 0.6s ease; z-index: 0;
     }
-    .cinema-ambient-glow.is-playing {
-      opacity: 0.95;
-      animation: ambientPulse 6s ease-in-out infinite alternate;
-    }
-    .cinema-ambient-glow.love-pulse {
-      background: linear-gradient(125deg, rgba(244, 63, 94, 0.6), rgba(245, 158, 11, 0.45), rgba(244, 63, 94, 0.6));
-      opacity: 1 !important;
-      transform: scale(1.02);
-    }
+    .cinema-ambient-glow.is-playing { border-color: rgba(229, 169, 60, 0.22); }
+    .cinema-ambient-glow.love-pulse { border-color: rgba(229, 169, 60, 0.8); }
 
-    @keyframes ambientPulse {
-      0% { opacity: 0.68; transform: scale(0.995); }
-      100% { opacity: 0.95; transform: scale(1.015); }
+    /* Slim amber scrubber (range input; the played fill is painted by
+       updateTimelineUI as a painted fill). */
+    .cinema-scrubber {
+      -webkit-appearance: none; appearance: none;
+      height: 3px; border-radius: 9999px;
+      background: rgba(255, 255, 255, 0.16);
+      outline: none; cursor: pointer;
     }
+    .cinema-scrubber::-webkit-slider-thumb {
+      -webkit-appearance: none; appearance: none;
+      width: 10px; height: 10px; border-radius: 9999px;
+      background: #E5A93C; border: 2px solid #0C0C0E; cursor: pointer;
+    }
+    .cinema-scrubber::-moz-range-thumb {
+      width: 10px; height: 10px; border-radius: 9999px;
+      background: #E5A93C; border: 2px solid #0C0C0E; cursor: pointer;
+    }
+    .cinema-scrubber::-moz-range-track { height: 3px; border-radius: 9999px; background: transparent; }
 
-    /* Floating Reaction Bubble Animation */
-    @keyframes floatReaction {
-      0% {
-        opacity: 0;
-        transform: translateY(20px) translateX(0px) scale(0.6);
-      }
-      15% {
-        opacity: 1;
-        transform: translateY(-20px) translateX(var(--sway-1, 14px)) scale(1.08);
-      }
-      50% {
-        opacity: 0.96;
-        transform: translateY(-130px) translateX(var(--sway-2, -16px)) scale(1);
-      }
-      85% {
-        opacity: 0.7;
-        transform: translateY(-240px) translateX(var(--sway-3, 12px)) scale(0.95);
-      }
-      100% {
-        opacity: 0;
-        transform: translateY(-310px) translateX(0px) scale(0.85);
-      }
+    .countdown-digit { animation: countPop 0.45s ease; }
+    @keyframes countPop {
+      0% { transform: scale(0.7); opacity: 0; }
+      60% { transform: scale(1.06); opacity: 1; }
+      100% { transform: scale(1); opacity: 1; }
     }
 
     .floating-reaction {
-      position: absolute;
-      bottom: 52px;
-      pointer-events: none;
-      z-index: 35;
-      animation: floatReaction 3.4s cubic-bezier(0.22, 1, 0.36, 1) forwards;
-      will-change: transform, opacity;
+      position: absolute; bottom: 12px;
+      animation: floatReaction 4s ease-out forwards; pointer-events: none;
+    }
+    @keyframes floatReaction {
+      0% { transform: translateY(0) translateX(var(--sway-1, 0)) scale(0.8); opacity: 0; }
+      12% { opacity: 1; transform: translateY(-18px) translateX(var(--sway-1, 0)) scale(1); }
+      50% { transform: translateY(-90px) translateX(var(--sway-2, 0)) scale(1.05); }
+      100% { transform: translateY(-190px) translateX(var(--sway-3, 0)) scale(0.95); opacity: 0; }
     }
 
-    /* Countdown Pop Animation */
-    @keyframes countPop {
-      0% { transform: scale(0.45); opacity: 0; }
-      35% { transform: scale(1.12); opacity: 1; }
-      80% { transform: scale(1); opacity: 1; }
-      100% { transform: scale(0.92); opacity: 0.85; }
-    }
-    .countdown-digit {
-      animation: countPop 0.85s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    /* Top nav: active view gets the amber underline (Stitch pattern). */
+    .app-nav-link { transition: color 0.15s ease; }
+    .app-nav-link.app-nav-active {
+      color: #F4F3EF; font-weight: 500;
+      border-bottom: 1px solid #E5A93C;
+      padding-bottom: 17px; margin-bottom: -17px;
     }
 
-    /* Custom Range Scrubber */
-    input[type="range"].cinema-scrubber {
-      -webkit-appearance: none;
-      appearance: none;
-      background: transparent;
-      cursor: pointer;
-    }
-    input[type="range"].cinema-scrubber::-webkit-slider-runnable-track {
-      height: 6px;
-      border-radius: 999px;
-    }
-    input[type="range"].cinema-scrubber::-webkit-slider-thumb {
-      -webkit-appearance: none;
-      appearance: none;
-      height: 16px;
-      width: 16px;
-      border-radius: 50%;
-      background: #fbbf24;
-      border: 2px solid #0a0c12;
-      box-shadow: 0 0 12px rgba(245, 158, 11, 0.8);
-      margin-top: -5px;
-      transition: transform 0.15s ease;
-    }
-    input[type="range"].cinema-scrubber:hover::-webkit-slider-thumb {
-      transform: scale(1.22);
-    }
+    /* Rail tabs: active tab gets the amber underline. */
+    .rail-tab-btn { border-bottom: 2px solid transparent; }
+    .rail-tab-btn.rail-tab-active { color: #F4F3EF; border-bottom-color: #E5A93C; }
 
-    /* Scrollbar styling */
-    ::-webkit-scrollbar {
-      width: 6px;
-      height: 6px;
-    }
-    ::-webkit-scrollbar-track {
-      background: rgba(10, 12, 18, 0.6);
-    }
-    ::-webkit-scrollbar-thumb {
-      background: rgba(245, 158, 11, 0.25);
-      border-radius: 999px;
-    }
-    ::-webkit-scrollbar-thumb:hover {
-      background: rgba(245, 158, 11, 0.45);
-    }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { scrollbar-width: none; }
 
-    /* Passport Ticket Perforation Style */
-    .passport-stamp {
-      background: linear-gradient(145deg, rgba(23, 28, 44, 0.92), rgba(13, 16, 26, 0.96));
-      border: 1px solid rgba(245, 158, 11, 0.24);
-      position: relative;
+    /* Mobile bottom sheet: on <lg the rail docks to the bottom of the
+       viewport and collapses to its header until tapped. Desktop is an
+       ordinary sidebar (the class does nothing there). */
+    @media (max-width: 1023.5px) {
+      #theaterRail.rail-collapsed .rail-body { display: none; }
     }
   </style>
 </head>
-<body class="selection:bg-amber-500/30 selection:text-amber-200">
+<body class="bg-canvas-background font-body-md text-text-primary antialiased selection:bg-primary selection:text-canvas-background min-h-screen">
+  <!-- Icon map (Material Symbols subset, PUA codepoints):
+       play_arrow E037 · pause E034 · volume_up E050 · volume_off E04F ·
+       fullscreen E5D0 · sync E627 · replay_10 E059 · forward_10 E056 ·
+       favorite E87E · star F09A · chat_bubble E0CB · book E86E · send E163 ·
+       close E5CD · keyboard_arrow_down E313 · mic E31D · mic_off E02B ·
+       videocam E04B · videocam_off E04C · call_end F0BC · link E250 ·
+       upload_file E9FC · play_circle E1C4 · folder_open E2C8 · download F090 ·
+       open_in_full F1CE · visibility_off E8F5 · check_circle F0BE ·
+       hourglass_empty E88B · delete E92E · logout E9BA · content_copy E14D ·
+       lock E899 · movie E404 -->
+  <input id="clipboardHelper" type="text" class="hidden" aria-hidden="true" tabindex="-1" />
+  <div id="toastContainer" class="fixed top-4 left-1/2 -translate-x-1/2 z-[100] flex flex-col items-center gap-2 pointer-events-none px-4 w-full max-w-md"></div>
 
-  <!-- Hidden textarea for safe iframe clipboard copy -->
-  <textarea id="clipboardHelper" class="fixed -top-96 left-0 opacity-0 pointer-events-none" aria-hidden="true"></textarea>
-
-  <!-- Global Activity Toast Banner -->
-  <div id="toastContainer" class="fixed top-4 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-2 pointer-events-none w-full max-w-md px-4"></div>
-
-  <!-- =====================================================================
-       VIEW 1: WELCOME & PRIVATE ROOM ENTRY
-  ====================================================================== -->
+  <!-- ======================================================================
+       VIEW 0: WELCOME — create / join a room, your name, load memories.
+       No Stitch design exists for this screen; restyled in the same system.
+       ====================================================================== -->
   <main id="welcomeView" class="min-h-screen flex items-center justify-center p-4 sm:p-6">
-    <div class="w-full max-w-lg glass-card rounded-3xl p-6 sm:p-9 relative overflow-hidden">
-      <!-- Subtle decorative velvet glow -->
-      <div class="absolute -top-24 -right-24 w-56 h-56 bg-amber-500/10 rounded-full blur-3xl pointer-events-none"></div>
-      <div class="absolute -bottom-24 -left-24 w-56 h-56 bg-rose-500/10 rounded-full blur-3xl pointer-events-none"></div>
-
-      <!-- Brand Marquee -->
-      <div class="text-center mb-7 relative">
-        <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/25 text-amber-400 text-xs font-medium tracking-wider uppercase mb-4">
-          <svg class="w-3.5 h-3.5 text-rose-400" fill="currentColor" viewBox="0 0 20 20"><path d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z"/></svg>
-          Private Velvet Screening Room
+    <div class="w-full max-w-lg bg-surface-card border border-hairline-border rounded-[10px] p-6 sm:p-9">
+      <div class="text-center mb-7">
+        <div class="flex items-center justify-center gap-2 mb-4">
+          <svg class="w-8 h-8" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#161310"/><path d="M26 20l18 12-18 12z" fill="#E8A33D"/></svg>
         </div>
-        <h1 class="font-serif text-3xl sm:text-4xl font-bold text-white tracking-tight">
-          Cinema <span class="text-amber-400 italic font-normal">for</span> Two <span class="align-middle px-2 py-0.5 rounded-md bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs font-bold tracking-wider">v2</span>
+        <p class="font-label-sm text-label-sm text-text-muted uppercase tracking-widest mb-3">Private Screening Room</p>
+        <h1 class="font-headline-md text-display-lg italic text-text-primary tracking-tight">
+          Cinema <span class="text-primary-container">for</span> Two
         </h1>
-        <p class="text-gray-400 text-sm sm:text-base mt-2 max-w-sm mx-auto leading-relaxed">
+        <p class="text-text-secondary text-sm sm:text-base mt-2 max-w-sm mx-auto leading-relaxed">
           Sync movies across miles, share live reactions, and stamp every date night into your shared passport.
         </p>
       </div>
 
-      <!-- Connection Status Indicator -->
-      <div id="authInitStatus" class="mb-5 flex items-center justify-center gap-2 text-xs text-gray-400">
-        <span class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
+      <div id="authInitStatus" class="mb-5 flex items-center justify-center gap-2 text-xs text-text-muted">
+        <span class="w-2 h-2 rounded-full bg-primary-container animate-pulse"></span>
         <span>Preparing private screening theater...</span>
       </div>
 
-      <!-- Step 1: Display Name -->
-      <div class="space-y-5 relative">
+      <div class="space-y-5">
         <div>
-          <label for="userNameInput" class="block text-xs font-semibold uppercase tracking-wider text-amber-300/90 mb-2">
+          <label for="userNameInput" class="block font-label-sm text-label-sm text-text-secondary uppercase tracking-wider mb-2">
             Your Name or Nickname
           </label>
           <input
@@ -257,291 +265,166 @@
             type="text"
             maxlength="24"
             placeholder="e.g., Alex or Babe"
-            class="w-full px-4 py-3.5 rounded-2xl bg-black/40 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:border-amber-400/70 focus:ring-2 focus:ring-amber-500/20 transition text-base"
+            class="w-full px-4 py-3 rounded-[6px] bg-canvas-background border border-hairline-border text-text-primary placeholder-text-muted focus:outline-none focus:border-primary-container/70 transition text-base h-10"
           />
         </div>
 
-        <!-- Invited Room Banner (Shown if #room=XXXXXX is detected in URL) -->
-        <div id="inviteDetectedBanner" class="hidden rounded-2xl bg-rose-500/10 border border-rose-500/30 p-3.5 text-sm text-rose-200 flex items-center justify-between gap-3">
+        <div id="inviteDetectedBanner" class="hidden rounded-[6px] bg-error-container/30 border border-error/30 p-3.5 text-sm text-error flex items-center justify-between gap-3">
           <div class="flex items-center gap-2.5">
-            <span class="text-lg">🎟️</span>
-            <span>Partner invite detected for room <strong id="detectedRoomCodeText" class="font-mono text-amber-300">------</strong></span>
+            <span class="material-symbols-outlined text-[18px]">&#xE250;</span>
+            <span>Partner invite detected for room <strong id="detectedRoomCodeText" class="font-code-timecode text-code-timecode text-primary-container">------</strong></span>
           </div>
         </div>
 
-        <!-- Action Cards -->
         <div class="grid grid-cols-1 gap-4 pt-1">
-          <!-- Create Room Button -->
           <button
             id="createRoomBtn"
             type="button"
-            class="w-full py-3.5 px-5 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-obsidian font-semibold text-base shadow-lg shadow-amber-500/20 transition transform active:scale-[0.99] flex items-center justify-center gap-2.5 cursor-pointer"
+            class="w-full h-10 px-5 rounded-[6px] bg-primary-container hover:bg-primary text-canvas-background font-semibold text-base transition flex items-center justify-center gap-2 cursor-pointer"
           >
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+            <span class="material-symbols-outlined text-[18px]">&#xE037;</span>
             Create a Private Room
           </button>
 
-          <!-- Divider -->
           <div class="relative flex items-center py-1">
-            <div class="flex-grow border-t border-white/10"></div>
-            <span class="flex-shrink mx-3 text-xs uppercase tracking-widest text-gray-500">or join partner</span>
-            <div class="flex-grow border-t border-white/10"></div>
+            <div class="flex-grow border-t border-hairline-border"></div>
+            <span class="flex-shrink mx-3 font-label-sm text-label-sm uppercase tracking-widest text-text-muted">or join partner</span>
+            <div class="flex-grow border-t border-hairline-border"></div>
           </div>
 
-          <!-- Join Room Input + Button -->
           <div class="flex flex-col sm:flex-row gap-2.5">
             <input
               id="joinCodeInput"
               type="text"
               maxlength="6"
               placeholder="6-CHAR CODE"
-              class="flex-1 px-4 py-3.5 rounded-2xl bg-black/40 border border-white/10 text-white font-mono uppercase tracking-[0.22em] text-center sm:text-left placeholder-gray-600 focus:outline-none focus:border-rose-400/70 focus:ring-2 focus:ring-rose-500/20 transition text-base"
+              class="flex-1 px-4 py-3 rounded-[6px] bg-canvas-background border border-hairline-border text-text-primary font-code-timecode uppercase tracking-[0.22em] text-center sm:text-left placeholder-text-muted focus:outline-none focus:border-primary-container/70 transition text-base h-10"
             />
             <button
               id="joinRoomBtn"
               type="button"
-              class="py-3.5 px-6 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/15 text-white font-semibold text-base transition transform active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer"
+              class="h-10 px-6 rounded-[6px] bg-surface-control hover:bg-surface-variant border border-hairline-border text-text-primary font-semibold text-base transition flex items-center justify-center gap-2 cursor-pointer"
             >
               <span>Join Room</span>
-              <svg class="w-4 h-4 text-rose-400" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
+              <span class="material-symbols-outlined text-[16px]">&#xE163;</span>
             </button>
           </div>
-          <!-- Memories File Import -->
-          <div class="pt-3 mt-1 border-t border-white/10">
-            <p class="text-xs font-semibold uppercase tracking-wider text-amber-300/90 mb-2">Have a memories file?</p>
-            <button id="welcomeImportBtn" type="button" class="w-full py-2.5 px-4 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 text-gray-200 font-semibold text-xs transition flex items-center justify-center gap-2 cursor-pointer">
-              <span>📂</span><span>Load memories (.jsonl)</span>
-            </button>
-            <input id="welcomeImportInput" type="file" accept=".jsonl,application/json" class="hidden" />
-            <p id="welcomeImportStatus" class="text-[11px] text-gray-500 mt-2 leading-relaxed"></p>
-          </div>
+        </div>
+
+        <!-- Memories File Import -->
+        <div class="pt-3 mt-1 border-t border-hairline-border">
+          <p class="font-label-sm text-label-sm text-text-secondary uppercase tracking-wider mb-2">Have a memories file?</p>
+          <button id="welcomeImportBtn" type="button" class="w-full h-10 px-4 rounded-[6px] bg-surface-control hover:bg-surface-variant border border-hairline-border text-text-primary font-semibold text-xs transition flex items-center justify-center gap-2 cursor-pointer">
+            <span class="material-symbols-outlined text-[16px] text-text-secondary">&#xE2C8;</span><span>Load memories (.jsonl)</span>
+          </button>
+          <input id="welcomeImportInput" type="file" accept=".jsonl,application/json" class="hidden" />
+          <p id="welcomeImportStatus" class="text-[11px] text-text-muted mt-2 leading-relaxed"></p>
         </div>
       </div>
     </div>
   </main>
 
-  <!-- =====================================================================
-       VIEW 2: SCREENING ROOM (ACTIVE WATCH PARTY)
-  ====================================================================== -->
-
-  <!-- v2: Pre-Show Face-to-Face Lounge — meet before the movie starts -->
-  <div id="loungeView" class="hidden min-h-screen flex flex-col items-center justify-center p-4 sm:p-6">
-    <div class="w-full max-w-3xl text-center">
-      <p class="text-xs font-semibold uppercase tracking-wider text-amber-300/90 mb-2">Pre-Show Lounge</p>
-      <h2 class="font-serif text-2xl sm:text-3xl font-bold text-white tracking-tight mb-2">Face to face before the film</h2>
-      <p id="loungeStatus" class="text-sm text-gray-400 mb-6">Waiting for your partner to join the room…</p>
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-        <div class="rounded-2xl overflow-hidden bg-black border border-white/10 aspect-video relative">
-          <video id="loungeLocalVideo" autoplay muted playsinline class="w-full h-full object-cover"></video>
-          <span id="loungeLocalName" class="absolute bottom-2 left-2 px-2 py-1 rounded-lg bg-black/60 text-xs text-white">You</span>
+  <!-- ======================================================================
+       HEADER — fixed top nav. Hidden on the welcome screen; shown by
+       enterTheaterUI once a room is entered. Nav switches real views.
+       ====================================================================== -->
+  <header id="appHeader" class="hidden fixed top-0 left-0 right-0 z-50 bg-canvas-background border-b border-hairline-border">
+    <div class="h-14 w-full px-gutter md:px-margin-desktop flex items-center justify-between gap-space-md">
+      <div class="flex items-center gap-space-md min-w-0">
+        <div class="flex items-center gap-space-sm shrink-0">
+          <svg class="w-6 h-6" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#161310"/><path d="M26 20l18 12-18 12z" fill="#E8A33D"/></svg>
+          <span class="font-headline-md text-headline-md italic tracking-tight text-text-primary hidden sm:inline-block">Cinema for Two</span>
         </div>
-        <div class="rounded-2xl overflow-hidden bg-black border border-white/10 aspect-video relative">
-          <video id="loungePartnerVideo" autoplay playsinline class="w-full h-full object-cover"></video>
-          <span id="loungePartnerName" class="absolute bottom-2 left-2 px-2 py-1 rounded-lg bg-black/60 text-xs text-white">Partner</span>
-        </div>
-      </div>
-      <div class="flex flex-wrap items-center justify-center gap-2 mb-4">
-        <button id="loungeCamBtn" type="button" class="px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-gray-200 font-semibold text-xs transition cursor-pointer">Camera off</button>
-        <button id="loungeMicBtn" type="button" class="px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-gray-200 font-semibold text-xs transition cursor-pointer">Mic on</button>
-      </div>
-      <button id="loungeStartBtn" type="button" class="px-6 py-3 rounded-2xl bg-amber-500 hover:bg-amber-400 text-obsidian font-bold text-sm transition cursor-pointer">Start watching together</button>
-      <div class="mt-3">
-        <button id="loungeNoVideoBtn" type="button" class="text-xs text-gray-400 hover:text-gray-200 underline underline-offset-2 cursor-pointer">Skip video — watch without camera</button>
-      </div>
-    </div>
-  </div>
-  <div id="theaterView" class="hidden min-h-screen flex flex-col pb-12">
-
-    <!-- v2: Floating Picture-in-Picture — drag it anywhere, or tap Corner to cycle corners -->
-    <div id="callPip" class="hidden fixed z-50 w-56 sm:w-64 rounded-2xl overflow-hidden bg-black border border-amber-500/40 shadow-2xl" style="right:12px;bottom:12px;touch-action:none;">
-      <div class="flex items-center justify-between px-2.5 py-1.5 bg-black/70 cursor-grab active:cursor-grabbing select-none">
-        <span id="pipPartnerName" class="text-xs font-semibold text-amber-200 truncate">Partner</span>
-        <span class="text-[10px] text-gray-400">drag me</span>
-      </div>
-      <div class="relative aspect-video bg-black">
-        <video id="pipPartnerVideo" autoplay playsinline class="w-full h-full object-cover"></video>
-        <video id="pipLocalVideo" autoplay muted playsinline class="absolute bottom-1.5 right-1.5 w-16 sm:w-20 aspect-video object-cover rounded-lg border border-white/30 bg-black"></video>
-      </div>
-      <div class="flex items-center justify-center gap-1 px-2 py-1.5 bg-black/70">
-        <button id="pipMicBtn" type="button" class="px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-gray-200 text-[11px] font-semibold cursor-pointer">Mic</button>
-        <button id="pipCamBtn" type="button" class="px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-gray-200 text-[11px] font-semibold cursor-pointer">Cam</button>
-        <button id="pipCornerBtn" type="button" class="px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-gray-200 text-[11px] font-semibold cursor-pointer">Corner</button>
-        <button id="pipHideBtn" type="button" class="px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-gray-200 text-[11px] font-semibold cursor-pointer">Hide</button>
-        <button id="pipEndBtn" type="button" class="px-2 py-1 rounded-lg bg-rose-500/80 hover:bg-rose-500 text-white text-[11px] font-semibold cursor-pointer">End</button>
-      </div>
-    </div>
-
-    <!-- Top Navigation Header -->
-    <header class="sticky top-0 z-40 glass-card border-x-0 border-t-0 rounded-none px-3 sm:px-6 py-3">
-      <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
-        <!-- Brand & Leave -->
-        <div class="flex items-center gap-3">
-          <button id="leaveRoomBtn" title="Switch Room" class="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white transition cursor-pointer">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+        <div class="h-4 w-px bg-hairline-border hidden sm:block shrink-0"></div>
+        <div class="flex items-center gap-space-xs bg-surface-card border border-hairline-border rounded px-space-sm py-0.5 shrink-0">
+          <span class="font-label-sm text-label-sm text-text-secondary uppercase tracking-widest">Room&nbsp;·&nbsp;<span id="roomCodeBadge" class="font-code-timecode text-code-timecode text-primary-container tracking-wider">------</span></span>
+          <button id="copyRoomCodeBtn" class="text-text-muted hover:text-text-primary transition-colors flex items-center justify-center p-0.5 cursor-pointer" title="Copy Room Code" type="button">
+            <span class="material-symbols-outlined text-[14px]">&#xE14D;</span>
           </button>
-          <div>
-            <div class="flex items-center gap-2">
-              <span class="font-serif text-lg sm:text-xl font-bold text-white tracking-tight">Cinema <span class="text-amber-400 italic font-normal">for</span> Two</span> <span class="px-1.5 py-0.5 rounded-md bg-amber-500/15 border border-amber-500/30 text-amber-300 text-[10px] font-bold tracking-wider">v2</span>
-            </div>
-            <p class="text-[11px] text-gray-400 hidden sm:block">Signed in as <span id="headerUserName" class="text-amber-300 font-medium">You</span></p>
+        </div>
+        <span class="hidden xl:flex items-center gap-1.5 font-label-sm text-label-sm text-text-muted shrink-0">YOU&nbsp;·&nbsp;<span id="headerUserName" class="text-text-secondary">You</span></span>
+      </div>
+
+      <nav class="hidden lg:flex items-center gap-space-lg" aria-label="Views">
+        <a href="#" class="app-nav-link app-nav-active transition-colors py-1 font-title-sm text-title-sm text-text-secondary hover:text-text-primary" data-nav-view="theater" aria-current="page">Screening Room</a>
+        <a href="#" class="app-nav-link transition-colors py-1 font-body-md text-body-md text-text-secondary hover:text-text-primary" data-nav-view="lounge">Pre-Show Lounge</a>
+        <a href="#" class="app-nav-link transition-colors py-1 font-body-md text-body-md text-text-secondary hover:text-text-primary" data-nav-view="passport">Shared Passport</a>
+      </nav>
+
+      <div class="flex items-center gap-space-sm sm:gap-space-md min-w-0 shrink-0">
+        <div id="presenceBadge" class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary-container/10 border border-primary-container/25 text-xs font-medium text-primary-container">
+          <span id="presenceDot" class="w-2 h-2 rounded-full bg-primary-container animate-pulse shrink-0"></span>
+          <span id="presenceText" class="hidden sm:inline truncate">Waiting for partner to join...</span>
+        </div>
+        <button id="showFacesBtn" type="button" class="hidden px-3 py-1.5 rounded-full bg-primary-container/15 hover:bg-primary-container/25 border border-primary-container/30 text-primary-container text-xs font-medium transition cursor-pointer shrink-0">Show faces</button>
+        <button id="copyInviteBtn" type="button" class="h-9 px-space-md bg-surface-control hover:bg-surface-variant text-text-primary border border-hairline-border rounded text-body-sm font-title-sm flex items-center gap-space-xs transition-colors cursor-pointer shrink-0">
+          <span class="material-symbols-outlined text-[16px] text-text-secondary">&#xE163;</span>
+          <span class="hidden sm:inline">Share Invite</span>
+        </button>
+        <button id="leaveRoomBtn" type="button" title="Leave room" class="w-9 h-9 rounded-[6px] bg-surface-control hover:bg-surface-variant border border-hairline-border text-text-secondary hover:text-text-primary flex items-center justify-center transition-colors cursor-pointer shrink-0">
+          <span class="material-symbols-outlined text-[18px]">&#xE9BA;</span>
+        </button>
+      </div>
+    </div>
+    <!-- Mobile nav (same three real views, second row under the header) -->
+    <div class="lg:hidden border-t border-hairline-border">
+      <div class="px-gutter flex items-center gap-6 h-10">
+        <a href="#" class="app-nav-link app-nav-active transition-colors py-1 font-title-sm text-title-sm text-text-secondary hover:text-text-primary" data-nav-view="theater" aria-current="page">Screening Room</a>
+        <a href="#" class="app-nav-link transition-colors py-1 font-body-md text-body-md text-text-secondary hover:text-text-primary" data-nav-view="lounge">Pre-Show Lounge</a>
+        <a href="#" class="app-nav-link transition-colors py-1 font-body-md text-body-md text-text-secondary hover:text-text-primary" data-nav-view="passport">Shared Passport</a>
+      </div>
+    </div>
+  </header>
+
+  <!-- ======================================================================
+       VIEW 1: MAIN SCREENING ROOM (theater)
+       ====================================================================== -->
+  <div id="theaterView" class="hidden min-h-screen flex flex-col">
+    <div class="w-full px-gutter md:px-margin-desktop pt-28 lg:pt-16 pb-28 lg:pb-12 flex-1">
+      <!-- Metadata strip: real title + real sync state (no fake film data) -->
+      <div class="flex flex-wrap items-end justify-between gap-space-md border-b border-hairline-border pb-space-sm">
+        <div class="flex flex-col gap-space-xs min-w-0">
+          <div class="flex items-center gap-space-sm text-text-muted font-label-sm text-label-sm tracking-wider uppercase">
+            <span>Screening Room</span>
+            <span>/</span>
+            <span class="text-primary-container">Synchronous Playback</span>
+          </div>
+          <div class="flex items-baseline gap-space-md flex-wrap">
+            <h1 id="nowPlayingTitle" class="font-headline-md text-headline-md italic text-text-primary tracking-tight">Your Private Screen Awaits</h1>
+            <span id="nowPlayingBanner" class="hidden flex items-center gap-1.5 px-2 py-0.5 rounded bg-surface-control border border-hairline-border font-label-sm text-label-sm text-text-secondary uppercase tracking-wider">
+              <span class="w-1.5 h-1.5 rounded-full bg-primary-container"></span>Now Playing
+            </span>
           </div>
         </div>
-
-        <!-- Center/Right Controls: Room Code, Copy Link, Partner Presence -->
-        <div class="flex flex-wrap items-center gap-2 sm:gap-3">
-          <!-- Partner Presence Badge -->
-          <div id="presenceBadge" class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/25 text-xs font-medium text-amber-200">
-            <span id="presenceDot" class="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse"></span>
-            <span id="presenceText">Waiting for partner to join...</span>
-          </div>
-          <button id="showFacesBtn" type="button" class="hidden px-3 py-1.5 rounded-full bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-200 text-xs font-medium transition cursor-pointer">Show faces</button>
-
-          <!-- Room Code + Copy Invite Button -->
-          <div class="flex items-center bg-black/50 border border-white/10 rounded-full p-1 pl-3">
-            <span class="text-[11px] text-gray-400 uppercase mr-1.5 hidden xs:inline">Room</span>
-            <span id="roomCodeBadge" class="font-mono text-xs sm:text-sm font-semibold text-amber-400 tracking-wider mr-2">------</span>
-            <button
-              id="copyInviteBtn"
-              type="button"
-              class="px-3 py-1.5 rounded-full bg-amber-500 hover:bg-amber-400 text-obsidian font-semibold text-xs transition flex items-center gap-1.5 cursor-pointer"
-            >
-              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
-              <span>Copy Invite Link</span>
-            </button>
+        <div class="flex items-center gap-space-md">
+          <span id="syncIndicatorText" class="hidden sm:inline-flex items-center gap-1.5 text-[11px] text-primary-container bg-primary-container/10 border border-primary-container/20 px-2.5 py-1 rounded-full">
+            <span class="w-1.5 h-1.5 rounded-full bg-primary-container animate-pulse"></span>
+            Connecting…
+          </span>
+          <div class="hidden sm:flex items-center gap-1 text-text-muted font-code-timecode text-code-timecode">
+            <span class="material-symbols-outlined text-[16px] text-text-secondary">&#xE899;</span>
+            <span>Peer-to-peer · No cloud</span>
           </div>
         </div>
       </div>
-    </header>
 
-    <!-- Main Theater Container -->
-    <div class="max-w-7xl w-full mx-auto px-3 sm:px-6 pt-4 sm:pt-6 flex-1">
-      <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
-
-        <!-- LEFT / MAIN COLUMN (8 cols on desktop): Source Switcher, Video Stage, Controls, Reactions -->
-        <div class="lg:col-span-8 space-y-4">
-
-          <!-- 1. Dual Video Source Switcher Card -->
-          <section class="glass-card rounded-2xl p-3.5 sm:p-4">
-            <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
-              <div class="flex items-center gap-1.5 bg-black/45 p-1 rounded-xl border border-white/5 w-full sm:w-auto">
-                <button type="button" data-source-tab="url" class="source-tab-btn flex-1 sm:flex-initial px-3 py-2 rounded-lg text-xs font-semibold transition bg-amber-500 text-obsidian cursor-pointer">
-                  🔗 Video / YouTube Link
-                </button>
-                <button type="button" data-source-tab="local" class="source-tab-btn flex-1 sm:flex-initial px-3 py-2 rounded-lg text-xs font-semibold transition text-gray-300 hover:text-white cursor-pointer">
-                  📁 Local Video File
-                </button>
-                <button type="button" data-source-tab="samples" class="source-tab-btn flex-1 sm:flex-initial px-3 py-2 rounded-lg text-xs font-semibold transition text-gray-300 hover:text-white cursor-pointer">
-                  🎬 Sample Clips
-                </button>
-              </div>
-
-              <!-- Quick Action Pills: Ready Check & Re-Sync -->
-              <div class="flex items-center gap-2 w-full sm:w-auto justify-end">
-                <button
-                  id="startReadyCheckBtn"
-                  type="button"
-                  class="flex-1 sm:flex-initial px-3.5 py-2 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/35 text-rose-300 text-xs font-semibold transition flex items-center justify-center gap-1.5 cursor-pointer"
-                >
-                  <span>⏱️</span>
-                  <span>3-2-1 Ready Check</span>
-                </button>
-                <button
-                  id="resyncNowBtn"
-                  type="button"
-                  class="flex-1 sm:flex-initial px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-gray-200 text-xs font-semibold transition flex items-center justify-center gap-1.5 cursor-pointer"
-                >
-                  <svg class="w-3.5 h-3.5 text-amber-400" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-                  <span>Re-Sync Now</span>
-                </button>
-              </div>
-            </div>
-
-            <!-- Tab Panel A: Video / YouTube Link -->
-            <div id="tabPanel-url" class="source-tab-panel">
-              <form id="urlLoadForm" class="flex flex-col sm:flex-row gap-2">
-                <input
-                  id="videoUrlInput"
-                  type="text"
-                  placeholder="Paste YouTube link (youtu.be/...) or direct .mp4 / .webm URL..."
-                  class="flex-1 px-3.5 py-2.5 rounded-xl bg-black/50 border border-white/10 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-amber-400/60"
-                />
-                <button
-                  type="submit"
-                  class="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-obsidian font-semibold text-xs sm:text-sm transition whitespace-nowrap cursor-pointer"
-                >
-                  Load for Both
-                </button>
-              </form>
-            </div>
-
-            <!-- Tab Panel B: Local Video File -->
-            <div id="tabPanel-local" class="source-tab-panel hidden">
-              <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-black/40 border border-dashed border-amber-500/30 rounded-xl p-3">
-                <div class="text-xs text-gray-300 space-y-0.5">
-                  <p class="font-medium text-amber-300">Zero-upload instant local playback</p>
-                  <p class="text-gray-400">Both partners select the same movie file on their own device; timestamps stay synced.</p>
-                  <p id="partnerLocalFileHint" class="hidden text-rose-300 font-medium pt-1"></p>
-                </div>
-                <label class="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-obsidian font-semibold text-xs text-center cursor-pointer transition shrink-0">
-                  Choose Video File
-                  <input id="localFileInput" type="file" accept="video/*" class="hidden" />
-                </label>
-              </div>
-              <div id="localFileSelectedBadge" class="hidden mt-2 text-xs text-emerald-300 flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 rounded-lg px-3 py-1.5">
-                <span>🎞️ Loaded locally:</span>
-                <span id="localFileNameDisplay" class="font-mono truncate"></span>
-              </div>
-            </div>
-
-            <!-- Tab Panel C: Sample Clips -->
-            <div id="tabPanel-samples" class="source-tab-panel hidden">
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                <button
-                  type="button"
-                  data-sample-url="https://www.youtube.com/watch?v=aqz-KE-bpKQ"
-                  data-sample-title="Big Buck Bunny — Animated Short (HD)"
-                  class="sample-clip-btn text-left p-3 rounded-xl bg-black/45 hover:bg-amber-500/10 border border-white/10 hover:border-amber-500/40 transition flex items-center gap-3 cursor-pointer"
-                >
-                  <span class="w-10 h-10 rounded-lg bg-amber-500/15 text-amber-400 flex items-center justify-center text-lg shrink-0">🐰</span>
-                  <div class="min-w-0">
-                    <p class="text-xs font-semibold text-white truncate">Big Buck Bunny (HD Short)</p>
-                    <p class="text-[11px] text-gray-400 truncate">Instant sync test • Open-source cinema</p>
-                  </div>
-                </button>
-
-                <button
-                  type="button"
-                  data-sample-url="https://www.youtube.com/watch?v=eRsGyueVLvQ"
-                  data-sample-title="Sintel — Fantasy Short Film"
-                  class="sample-clip-btn text-left p-3 rounded-xl bg-black/45 hover:bg-rose-500/10 border border-white/10 hover:border-rose-500/40 transition flex items-center gap-3 cursor-pointer"
-                >
-                  <span class="w-10 h-10 rounded-lg bg-rose-500/15 text-rose-400 flex items-center justify-center text-lg shrink-0">🐉</span>
-                  <div class="min-w-0">
-                    <p class="text-xs font-semibold text-white truncate">Sintel — Fantasy Short Film</p>
-                    <p class="text-[11px] text-gray-400 truncate">Atmospheric adventure • Blender Studio</p>
-                  </div>
-                </button>
-              </div>
-            </div>
-          </section>
-
-          <!-- 2. Video Player Stage with Ambient Glow & Floating Reaction Layer -->
-          <section class="cinema-stage-wrapper">
+      <!-- Main grid: stage (72%) + rail (28%) -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-space-lg items-start mt-4">
+        <section class="lg:col-span-8 xl:col-span-9 flex flex-col gap-3">
+          <!-- Player stage -->
+          <div class="relative">
             <div id="ambientGlow" class="cinema-ambient-glow"></div>
-
-            <div id="playerStage" class="relative z-10 rounded-2xl overflow-hidden bg-black border border-white/10 shadow-2xl aspect-video w-full">
-              <!-- Empty Placeholder Screen -->
-              <div id="emptyPlayerPlaceholder" class="absolute inset-0 flex flex-col items-center justify-center text-center p-6 bg-gradient-to-b from-[#101420] to-[#07090e]">
-                <div class="w-16 h-16 rounded-full bg-amber-500/10 border border-amber-500/25 flex items-center justify-center text-3xl mb-3 shadow-lg shadow-amber-500/10">
-                  🍿
+            <div id="playerStage" class="relative w-full aspect-video bg-black rounded-[10px] border border-hairline-border overflow-hidden select-none">
+              <div id="emptyPlayerPlaceholder" class="absolute inset-0 flex flex-col items-center justify-center text-center p-6 bg-canvas-background">
+                <div class="w-16 h-16 rounded-full bg-surface-control border border-hairline-border flex items-center justify-center mb-3">
+                  <span class="material-symbols-outlined text-[28px] text-primary-container">&#xE404;</span>
                 </div>
-                <h2 class="font-serif text-xl sm:text-2xl text-white font-semibold">Your Private Screen Awaits</h2>
-                <p class="text-xs sm:text-sm text-gray-400 max-w-md mt-1.5">
-                  Paste a YouTube or video URL above, pick a local movie file on both devices, or tap a Sample Clip to start watching together.
+                <h2 class="font-headline-md text-headline-md text-text-primary">Your Private Screen Awaits</h2>
+                <p class="font-body-sm text-body-sm text-text-secondary max-w-md mt-1.5">
+                  Pick a source in the Pre-Show Lounge — a YouTube or video URL, a local movie file on both devices, or a Sample Clip — to start watching together.
                 </p>
               </div>
 
-              <!-- HTML5 Video Element (for Local Files, Direct URLs, and Sample Clips) -->
               <video
                 id="html5VideoPlayer"
                 class="hidden w-full h-full object-contain bg-black"
@@ -549,335 +432,488 @@
                 preload="metadata"
               ></video>
 
-              <!-- YouTube IFrame Container -->
               <div id="youtubePlayerWrapper" class="hidden w-full h-full">
                 <div id="youtubePlayerMount" class="w-full h-full"></div>
               </div>
 
-              <!-- Floating Live Reactions Overlay Layer -->
               <div id="floatingReactionsLayer" class="absolute inset-0 pointer-events-none overflow-hidden z-30"></div>
 
-              <!-- Now Playing Subtle Pill Badge -->
-              <div id="nowPlayingBanner" class="hidden absolute top-3 left-3 z-20 px-3 py-1 rounded-full bg-black/65 backdrop-blur-md border border-white/10 text-[11px] text-gray-200 flex items-center gap-2 max-w-[75%]">
-                <span class="w-2 h-2 rounded-full bg-rose-500 animate-ping"></span>
-                <span id="nowPlayingTitle" class="truncate">Ready</span>
-              </div>
-
-              <!-- 3-2-1 Ready Check & Countdown Overlay -->
-              <div id="readyCheckOverlay" class="hidden absolute inset-0 z-40 bg-obsidian/90 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center">
-                <!-- Ready Prompt State -->
+              <!-- 3-2-1 Ready Check overlay -->
+              <div id="readyCheckOverlay" class="hidden absolute inset-0 z-40 bg-canvas-background/95 flex flex-col items-center justify-center p-6 text-center">
                 <div id="readyPromptBox" class="max-w-sm w-full space-y-4">
-                  <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs font-semibold uppercase tracking-wider">
+                  <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary-container/10 border border-primary-container/30 text-primary-container text-xs font-semibold uppercase tracking-wider">
                     Synchronized Start
                   </div>
-                  <h3 class="font-serif text-2xl sm:text-3xl text-white font-bold">Are You Both Ready?</h3>
-                  <p id="readyStartedByText" class="text-xs sm:text-sm text-gray-300">Tap below when you've got your snacks and volume set.</p>
-
-                  <!-- Participant Status List -->
+                  <h3 class="font-headline-md text-headline-md text-text-primary">Are You Both Ready?</h3>
+                  <p id="readyStartedByText" class="font-body-sm text-body-sm text-text-secondary">Tap below when you've got your snacks and volume set.</p>
                   <div id="readyStatusList" class="flex flex-wrap items-center justify-center gap-2 py-2"></div>
-
                   <div class="flex items-center justify-center gap-3 pt-1">
                     <button
                       id="confirmReadyBtn"
                       type="button"
-                      class="px-6 py-3 rounded-2xl bg-gradient-to-r from-amber-500 to-rose-500 hover:from-amber-400 hover:to-rose-400 text-obsidian font-bold text-sm shadow-lg shadow-rose-500/25 transition transform active:scale-95 cursor-pointer"
-                    >
-                      I'm Ready 🍿
-                    </button>
+                      class="px-6 py-3 rounded-[6px] bg-primary-container hover:bg-primary text-canvas-background font-bold text-sm transition cursor-pointer"
+                    >I'm Ready</button>
                     <button
                       id="cancelReadyBtn"
                       type="button"
-                      class="px-4 py-3 rounded-2xl bg-white/10 hover:bg-white/15 text-gray-300 text-xs font-semibold transition cursor-pointer"
-                    >
-                      Cancel
-                    </button>
+                      class="px-4 py-3 rounded-[6px] bg-surface-control hover:bg-surface-variant border border-hairline-border text-text-secondary text-xs font-semibold transition cursor-pointer"
+                    >Cancel</button>
                   </div>
                 </div>
-
-                <!-- Animated Countdown State -->
                 <div id="countdownBox" class="hidden space-y-2">
-                  <div id="countdownNumber" class="countdown-digit font-serif text-7xl sm:text-8xl font-bold text-amber-400 drop-shadow-[0_0_25px_rgba(245,158,11,0.6)]">
-                    3
-                  </div>
-                  <p id="countdownSubtext" class="text-sm sm:text-base text-rose-200 font-medium tracking-wide">
-                    Syncing screens...
-                  </p>
+                  <div id="countdownNumber" class="countdown-digit font-headline-md text-[72px] leading-none font-normal text-primary-container">3</div>
+                  <p id="countdownSubtext" class="font-body-sm text-body-sm text-text-secondary font-medium tracking-wide">Syncing screens...</p>
                 </div>
               </div>
             </div>
+          </div>
 
-            <!-- Unified Synced Playback Control Bar -->
-            <div class="relative z-10 mt-2.5 glass-card rounded-2xl px-3.5 py-2.5 flex flex-col gap-2">
-              <!-- Timeline Scrubber -->
-              <div class="flex items-center gap-3">
-                <span id="currentTimeLabel" class="font-mono text-[11px] text-gray-300 w-12 text-right">00:00</span>
-                <input
-                  id="timelineScrubber"
-                  type="range"
-                  min="0"
-                  max="100"
-                  step="0.1"
-                  value="0"
-                  class="cinema-scrubber flex-1 h-2 rounded-lg bg-white/15"
-                />
-                <span id="durationLabel" class="font-mono text-[11px] text-gray-400 w-12">00:00</span>
+          <!-- Transport bar -->
+          <div class="bg-surface-card rounded-[10px] border border-hairline-border px-4 py-3 flex flex-col gap-2.5">
+            <div class="flex items-center gap-3">
+              <span id="currentTimeLabel" class="font-code-timecode text-code-timecode text-primary select-none whitespace-nowrap tabular-nums w-12 text-right">00:00</span>
+              <input
+                id="timelineScrubber"
+                type="range"
+                min="0"
+                max="100"
+                step="0.1"
+                value="0"
+                class="cinema-scrubber flex-1"
+              />
+              <span id="durationLabel" class="font-code-timecode text-code-timecode text-text-muted select-none whitespace-nowrap tabular-nums w-12">00:00</span>
+            </div>
+            <div class="flex items-center justify-between gap-2 flex-wrap">
+              <div class="flex items-center gap-1.5">
+                <button
+                  id="playPauseBtn"
+                  type="button"
+                  title="Play / Pause"
+                  class="w-[38px] h-[38px] shrink-0 rounded-[6px] bg-surface-control hover:bg-surface-variant border border-hairline-border flex items-center justify-center text-text-primary transition-colors cursor-pointer"
+                >
+                  <span id="playIcon" class="material-symbols-outlined text-[20px]">&#xE037;</span>
+                  <span id="pauseIcon" class="material-symbols-outlined text-[20px] hidden">&#xE034;</span>
+                  <span id="playPauseLabel" class="hidden">Play</span>
+                </button>
+                <button id="skipBackBtn" type="button" title="Rewind 10s" class="w-[38px] h-[38px] shrink-0 rounded-[6px] bg-surface-control hover:bg-surface-variant border border-hairline-border flex items-center justify-center text-text-secondary hover:text-text-primary transition-colors cursor-pointer">
+                  <span class="material-symbols-outlined text-[18px]">&#xE059;</span>
+                </button>
+                <button id="skipForwardBtn" type="button" title="Forward 10s" class="w-[38px] h-[38px] shrink-0 rounded-[6px] bg-surface-control hover:bg-surface-variant border border-hairline-border flex items-center justify-center text-text-secondary hover:text-text-primary transition-colors cursor-pointer">
+                  <span class="material-symbols-outlined text-[18px]">&#xE056;</span>
+                </button>
+                <button id="muteToggleBtn" type="button" title="Mute / Unmute" class="w-[38px] h-[38px] shrink-0 rounded-[6px] bg-surface-control hover:bg-surface-variant border border-hairline-border flex items-center justify-center text-text-secondary hover:text-text-primary transition-colors cursor-pointer">
+                  <span id="volOnIcon" class="material-symbols-outlined text-[18px]">&#xE050;</span>
+                  <span id="volOffIcon" class="material-symbols-outlined text-[18px] text-error hidden">&#xE04F;</span>
+                </button>
+                <button id="fullscreenBtn" type="button" title="Fullscreen" class="w-[38px] h-[38px] shrink-0 rounded-[6px] bg-surface-control hover:bg-surface-variant border border-hairline-border flex items-center justify-center text-text-secondary hover:text-text-primary transition-colors cursor-pointer">
+                  <span class="material-symbols-outlined text-[18px]">&#xE5D0;</span>
+                </button>
               </div>
-
-              <!-- Transport Buttons Row -->
-              <div class="flex items-center justify-between gap-2">
-                <div class="flex items-center gap-1.5 sm:gap-2">
-                  <!-- Play / Pause Button -->
-                  <button
-                    id="playPauseBtn"
-                    type="button"
-                    class="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-obsidian font-semibold text-xs sm:text-sm transition flex items-center gap-1.5 shadow-md shadow-amber-500/20 cursor-pointer"
-                  >
-                    <svg id="playIcon" class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z"/></svg>
-                    <svg id="pauseIcon" class="w-4 h-4 hidden" fill="currentColor" viewBox="0 0 20 20"><path d="M5.75 3a.75.75 0 00-.75.75v12.5c0 .414.336.75.75.75h1.5a.75.75 0 00.75-.75V3.75A.75.75 0 007.25 3h-1.5zM12.75 3a.75.75 0 00-.75.75v12.5c0 .414.336.75.75.75h1.5a.75.75 0 00.75-.75V3.75a.75.75 0 00-.75-.75h-1.5z"/></svg>
-                    <span id="playPauseLabel">Play</span>
-                  </button>
-
-                  <!-- -10s / +10s Skip -->
-                  <button id="skipBackBtn" type="button" title="Rewind 10s" class="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-gray-300 text-xs font-mono transition cursor-pointer">
-                    -10s
-                  </button>
-                  <button id="skipForwardBtn" type="button" title="Forward 10s" class="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-gray-300 text-xs font-mono transition cursor-pointer">
-                    +10s
-                  </button>
-                </div>
-
-                <!-- Right Controls: Sync Status, Mute, Fullscreen -->
-                <div class="flex items-center gap-2">
-                  <span id="syncIndicatorText" class="hidden sm:inline-flex items-center gap-1.5 text-[11px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-full">
-                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-                    Live Synced
-                  </span>
-
-                  <button id="muteToggleBtn" type="button" title="Mute / Unmute" class="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-gray-300 transition cursor-pointer">
-                    <svg id="volOnIcon" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/></svg>
-                    <svg id="volOffIcon" class="w-4 h-4 hidden text-rose-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15zM17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2"/></svg>
-                  </button>
-
-                  <button id="fullscreenBtn" type="button" title="Fullscreen" class="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-gray-300 transition cursor-pointer">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/></svg>
-                  </button>
-                </div>
+              <div class="flex items-center gap-2 flex-wrap">
+                <button id="resyncNowBtn" type="button" class="h-[38px] px-3 rounded-[6px] bg-surface-control hover:bg-surface-variant border border-hairline-border text-text-secondary hover:text-text-primary font-title-sm text-title-sm flex items-center gap-1.5 transition-colors cursor-pointer">
+                  <span class="material-symbols-outlined text-[16px]">&#xE627;</span>
+                  <span class="hidden sm:inline">Re-Sync</span>
+                </button>
+                <button id="startReadyCheckBtn" type="button" class="h-[38px] px-4 rounded-[6px] bg-primary-container hover:bg-primary text-canvas-background font-title-sm text-title-sm transition-colors cursor-pointer">3-2-1 SYNC</button>
+                <button id="thinkingOfYouBtn" type="button" class="h-[38px] px-3 rounded-[6px] bg-surface-control hover:bg-surface-variant border border-hairline-border text-text-primary font-title-sm text-title-sm flex items-center gap-1.5 transition-colors cursor-pointer">
+                  <span class="material-symbols-outlined text-[16px] text-primary-container">&#xE87E;</span>
+                  <span class="hidden sm:inline">Thinking of You</span>
+                </button>
               </div>
             </div>
-          </section>
+          </div>
+        </section>
 
-          <!-- 3. Tactile Floating Reaction Dock -->
-          <section class="glass-card rounded-2xl p-3 sm:p-4">
-            <div class="flex flex-wrap items-center justify-between gap-2.5">
-              <div class="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-                <button type="button" data-emoji="❤️" class="reaction-btn w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-white/5 hover:bg-rose-500/20 border border-white/10 hover:border-rose-500/40 text-xl sm:text-2xl flex items-center justify-center transition transform active:scale-90 cursor-pointer">❤️</button>
-                <button type="button" data-emoji="😂" class="reaction-btn w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-white/5 hover:bg-amber-500/20 border border-white/10 hover:border-amber-500/40 text-xl sm:text-2xl flex items-center justify-center transition transform active:scale-90 cursor-pointer">😂</button>
-                <button type="button" data-emoji="😱" class="reaction-btn w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-white/5 hover:bg-amber-500/20 border border-white/10 hover:border-amber-500/40 text-xl sm:text-2xl flex items-center justify-center transition transform active:scale-90 cursor-pointer">😱</button>
-                <button type="button" data-emoji="😭" class="reaction-btn w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-white/5 hover:bg-amber-500/20 border border-white/10 hover:border-amber-500/40 text-xl sm:text-2xl flex items-center justify-center transition transform active:scale-90 cursor-pointer">😭</button>
-                <button type="button" data-emoji="🍿" class="reaction-btn w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-white/5 hover:bg-amber-500/20 border border-white/10 hover:border-amber-500/40 text-xl sm:text-2xl flex items-center justify-center transition transform active:scale-90 cursor-pointer">🍿</button>
-                <button type="button" data-emoji="🔥" class="reaction-btn w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-white/5 hover:bg-amber-500/20 border border-white/10 hover:border-amber-500/40 text-xl sm:text-2xl flex items-center justify-center transition transform active:scale-90 cursor-pointer">🔥</button>
-                <button type="button" data-emoji="🥺" class="reaction-btn w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-white/5 hover:bg-rose-500/20 border border-white/10 hover:border-rose-500/40 text-xl sm:text-2xl flex items-center justify-center transition transform active:scale-90 cursor-pointer">🥺</button>
-              </div>
-
-              <!-- Special Thinking of You Pulse Button -->
+        <!-- Right rail: Whisper Notes / Passport tabs (bottom sheet on mobile) -->
+        <div id="theaterRail" class="rail-collapsed lg:col-span-4 xl:col-span-3 bg-surface-card border border-hairline-border rounded-[10px] overflow-hidden max-lg:fixed max-lg:inset-x-0 max-lg:bottom-0 max-lg:z-40 max-lg:rounded-b-none max-lg:max-h-[70vh] max-lg:flex max-lg:flex-col">
+          <div id="railHeader" class="shrink-0 cursor-pointer lg:cursor-default">
+            <div class="lg:hidden flex justify-center pt-2 pb-1">
+              <div class="w-8 h-1 rounded-full bg-surface-variant"></div>
+            </div>
+            <div class="flex items-stretch border-b border-hairline-border">
               <button
-                id="thinkingOfYouBtn"
+                id="toggleWhisperBtn"
                 type="button"
-                class="w-full sm:w-auto px-4 py-3 rounded-2xl bg-gradient-to-r from-rose-500/25 to-amber-500/20 hover:from-rose-500/35 hover:to-amber-500/30 border border-rose-400/40 text-rose-200 font-semibold text-xs sm:text-sm transition transform active:scale-95 flex items-center justify-center gap-2 shadow-lg shadow-rose-500/10 cursor-pointer"
+                data-rail-tab="whisper"
+                class="rail-tab-btn rail-tab-active flex-1 flex items-center justify-center gap-2 px-3 py-3 font-title-sm text-title-sm text-text-secondary hover:text-text-primary transition-colors cursor-pointer"
               >
-                <span class="text-base">💌</span>
-                <span>Thinking of You</span>
+                <span class="material-symbols-outlined text-[16px]">&#xE0CB;</span>
+                <span>Whisper Notes</span>
+                <span id="whisperUnreadBadge" class="hidden px-2 py-0.5 rounded-full bg-error-container text-on-error-container text-[10px] font-bold">New</span>
+                <span id="whisperChevron" class="material-symbols-outlined text-[16px] transition-transform duration-200">&#xE313;</span>
+              </button>
+              <button
+                type="button"
+                data-rail-tab="passport"
+                class="rail-tab-btn flex-1 flex items-center justify-center gap-2 px-3 py-3 font-title-sm text-title-sm text-text-secondary hover:text-text-primary transition-colors cursor-pointer"
+              >
+                <span class="material-symbols-outlined text-[16px]">&#xE86E;</span>
+                <span>Passport</span>
+                <span id="passportCountBadge" class="font-code-timecode text-code-timecode text-primary-container">0 films</span>
               </button>
             </div>
-          </section>
-        </div>
+          </div>
 
-        <!-- RIGHT COLUMN (4 cols on desktop): Collapsible Whisper Chat + Together Rating & Movie Passport -->
-        <div class="lg:col-span-4 space-y-4">
-
-          <!-- 4. Whisper Chat Drawer Card -->
-          <section class="glass-card rounded-2xl overflow-hidden">
-            <button
-              id="toggleWhisperBtn"
-              type="button"
-              class="w-full px-4 py-3.5 flex items-center justify-between text-left hover:bg-white/[0.02] transition cursor-pointer"
-            >
-              <div class="flex items-center gap-2.5">
-                <span class="text-base">💬</span>
-                <div>
-                  <h3 class="text-sm font-semibold text-white">Whisper Chat</h3>
-                  <p class="text-[11px] text-gray-400">Timestamped notes during the show</p>
-                </div>
-              </div>
-              <div class="flex items-center gap-2">
-                <span id="whisperUnreadBadge" class="hidden px-2 py-0.5 rounded-full bg-rose-500 text-white text-[10px] font-bold">New</span>
-                <svg id="whisperChevron" class="w-4 h-4 text-gray-400 transition-transform duration-200" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
-              </div>
-            </button>
-
-            <div id="whisperDrawerBody" class="border-t border-white/10 p-3.5 space-y-3">
-              <!-- Messages List -->
-              <div id="whisperMessagesList" class="h-52 overflow-y-auto space-y-2.5 pr-1 flex flex-col">
-                <div class="text-center text-xs text-gray-500 my-auto py-6">
+          <div class="rail-body max-lg:overflow-y-auto">
+            <!-- Whisper pane -->
+            <div id="whisperDrawerBody" class="p-3.5 space-y-3">
+              <div id="whisperMessagesList" class="no-scrollbar h-52 overflow-y-auto space-y-2.5 pr-1 flex flex-col">
+                <div class="text-center text-xs text-text-muted my-auto py-6">
                   No whispers yet — send a sweet note or timestamped reaction!
                 </div>
               </div>
-
-              <!-- Quick Whisper Chips -->
-              <div class="flex items-center gap-1.5 overflow-x-auto pb-1">
-                <button type="button" data-quick-whisper="Wait rewind that! ⏪" class="quick-whisper-btn shrink-0 px-2.5 py-1 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-[11px] text-gray-300 transition cursor-pointer">Rewind that ⏪</button>
-                <button type="button" data-quick-whisper="Snack break in 2 mins? 🍿" class="quick-whisper-btn shrink-0 px-2.5 py-1 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-[11px] text-gray-300 transition cursor-pointer">Snack break? 🍿</button>
-                <button type="button" data-quick-whisper="I love this part ✨" class="quick-whisper-btn shrink-0 px-2.5 py-1 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-[11px] text-gray-300 transition cursor-pointer">Love this ✨</button>
+              <div class="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1">
+                <button type="button" data-quick-whisper="Wait rewind that!" class="quick-whisper-btn shrink-0 px-2.5 py-1 rounded-full bg-surface-control hover:bg-surface-variant border border-hairline-border text-[11px] text-text-secondary transition cursor-pointer">Rewind that</button>
+                <button type="button" data-quick-whisper="Snack break in 2 mins?" class="quick-whisper-btn shrink-0 px-2.5 py-1 rounded-full bg-surface-control hover:bg-surface-variant border border-hairline-border text-[11px] text-text-secondary transition cursor-pointer">Snack break?</button>
+                <button type="button" data-quick-whisper="I love this part" class="quick-whisper-btn shrink-0 px-2.5 py-1 rounded-full bg-surface-control hover:bg-surface-variant border border-hairline-border text-[11px] text-text-secondary transition cursor-pointer">Love this</button>
               </div>
-
-              <!-- Whisper Input Form -->
+              <div class="flex items-center gap-1.5 flex-wrap">
+                <button type="button" data-emoji="✦" title="Sparkle" class="reaction-btn w-10 h-10 rounded-[6px] bg-surface-control hover:bg-surface-variant border border-hairline-border text-lg text-text-primary flex items-center justify-center transition cursor-pointer">✦</button>
+                <button type="button" data-emoji="⟡" title="Glow" class="reaction-btn w-10 h-10 rounded-[6px] bg-surface-control hover:bg-surface-variant border border-hairline-border text-lg text-text-primary flex items-center justify-center transition cursor-pointer">⟡</button>
+                <button type="button" data-emoji="♫" title="Music" class="reaction-btn w-10 h-10 rounded-[6px] bg-surface-control hover:bg-surface-variant border border-hairline-border text-lg text-text-primary flex items-center justify-center transition cursor-pointer">♫</button>
+                <button type="button" data-emoji="☕" title="Cozy" class="reaction-btn w-10 h-10 rounded-[6px] bg-surface-control hover:bg-surface-variant border border-hairline-border text-lg text-text-primary flex items-center justify-center transition cursor-pointer">☕</button>
+                <button type="button" data-emoji="☾" title="Night" class="reaction-btn w-10 h-10 rounded-[6px] bg-surface-control hover:bg-surface-variant border border-hairline-border text-lg text-text-primary flex items-center justify-center transition cursor-pointer">☾</button>
+              </div>
               <form id="whisperForm" class="flex gap-2">
                 <input
                   id="whisperInput"
                   type="text"
                   maxlength="220"
                   placeholder="Whisper something..."
-                  class="flex-1 px-3.5 py-2.5 rounded-xl bg-black/50 border border-white/10 text-xs sm:text-sm text-white placeholder-gray-500 focus:outline-none focus:border-amber-400/60"
+                  class="flex-1 min-w-0 px-3.5 py-2.5 rounded-[6px] bg-canvas-background border border-hairline-border text-xs sm:text-sm text-text-primary placeholder-text-muted focus:outline-none focus:border-primary-container/60"
                 />
                 <button
                   type="submit"
-                  class="px-3.5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-obsidian font-semibold text-xs transition cursor-pointer"
+                  class="h-10 px-3.5 rounded-[6px] bg-primary-container hover:bg-primary text-canvas-background font-semibold text-xs transition cursor-pointer flex items-center gap-1.5"
                 >
-                  Send
+                  <span class="material-symbols-outlined text-[16px]">&#xE163;</span>
+                  <span class="hidden sm:inline">Send</span>
                 </button>
               </form>
             </div>
-          </section>
 
-          <!-- 5. Rate Movie Together & Shared Movie Passport Card -->
-          <section class="glass-card rounded-2xl p-4 space-y-4">
-            <div class="flex items-center justify-between gap-2">
-              <div>
-                <h3 class="font-serif text-lg font-bold text-white flex items-center gap-2">
-                  <span>🛂</span>
-                  <span>Movie Passport</span>
-                </h3>
-                <p class="text-[11px] text-gray-400">Rate together & save your date-night memories</p>
+            <!-- Passport pane -->
+            <div id="railPassportPane" class="hidden p-3.5 space-y-3">
+              <div class="flex items-center justify-between gap-2">
+                <span class="font-label-sm text-label-sm text-text-muted uppercase tracking-wider">Stamped Memories</span>
+                <button type="button" class="rate-movie-trigger font-title-sm text-title-sm text-primary-container hover:text-primary transition-colors cursor-pointer">Rate Movie</button>
               </div>
-              <button
-                id="toggleRatePanelBtn"
-                type="button"
-                class="px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-obsidian font-semibold text-xs shadow-md shadow-amber-500/15 transition cursor-pointer"
-              >
-                ★ Rate Movie Together
-              </button>
-            </div>
-
-            <!-- Collapsible Rating Panel -->
-            <div id="rateMoviePanel" class="hidden rounded-2xl bg-black/45 border border-amber-500/25 p-3.5 space-y-3.5">
-              <div class="flex items-center justify-between">
-                <span class="text-xs font-semibold uppercase tracking-wider text-amber-400">Tonight's Feature</span>
-                <button id="closeRatePanelBtn" type="button" class="text-xs text-gray-400 hover:text-white cursor-pointer">Close ✕</button>
-              </div>
-
-              <!-- Movie Title -->
-              <div>
-                <label class="block text-[11px] text-gray-400 mb-1">Movie / Video Title</label>
-                <input
-                  id="ratingMovieTitleInput"
-                  type="text"
-                  placeholder="Enter movie title..."
-                  class="w-full px-3 py-2 rounded-xl bg-black/50 border border-white/10 text-xs sm:text-sm text-white focus:outline-none focus:border-amber-400/60"
-                />
-              </div>
-
-              <!-- Half-Star Interactive Rating -->
-              <div>
-                <div class="flex items-center justify-between mb-1.5">
-                  <label class="text-[11px] text-gray-400">Your Star Rating (tap left/right half)</label>
-                  <span id="myRatingNumeric" class="font-mono text-xs font-bold text-amber-400">4.5 / 5.0 ★</span>
-                </div>
-                <div id="starSelectorContainer" class="flex items-center gap-1.5"></div>
-              </div>
-
-              <!-- Mood / Vibe Tags -->
-              <div>
-                <label class="block text-[11px] text-gray-400 mb-1.5">Vibe Tags</label>
-                <div id="vibeTagsContainer" class="flex flex-wrap gap-1.5">
-                  <button type="button" data-vibe="Cozy" class="vibe-tag-btn px-2.5 py-1 rounded-full text-[11px] border border-white/15 bg-white/5 text-gray-300 transition cursor-pointer">Cozy</button>
-                  <button type="button" data-vibe="Tearjerker" class="vibe-tag-btn px-2.5 py-1 rounded-full text-[11px] border border-white/15 bg-white/5 text-gray-300 transition cursor-pointer">Tearjerker</button>
-                  <button type="button" data-vibe="Hilarious" class="vibe-tag-btn px-2.5 py-1 rounded-full text-[11px] border border-white/15 bg-white/5 text-gray-300 transition cursor-pointer">Hilarious</button>
-                  <button type="button" data-vibe="Thriller" class="vibe-tag-btn px-2.5 py-1 rounded-full text-[11px] border border-white/15 bg-white/5 text-gray-300 transition cursor-pointer">Thriller</button>
-                  <button type="button" data-vibe="Romantic" class="vibe-tag-btn px-2.5 py-1 rounded-full text-[11px] border border-white/15 bg-white/5 text-gray-300 transition cursor-pointer">Romantic</button>
-                  <button type="button" data-vibe="Rewatch Worthy" class="vibe-tag-btn px-2.5 py-1 rounded-full text-[11px] border border-white/15 bg-white/5 text-gray-300 transition cursor-pointer">Rewatch Worthy</button>
+              <div id="passportTimelineList" class="no-scrollbar space-y-2.5 max-h-80 overflow-y-auto pr-1">
+                <div class="rounded-[6px] border border-dashed border-hairline-border p-4 text-center text-xs text-text-muted">
+                  Your passport is ready for its first stamp! Tap <strong class="text-primary-container">★ Rate Movie Together</strong> after watching.
                 </div>
               </div>
-
-              <!-- Favorite Quote / Memory Note -->
-              <div>
-                <label class="block text-[11px] text-gray-400 mb-1">Favorite Quote or Memory Note</label>
-                <textarea
-                  id="ratingNoteInput"
-                  rows="2"
-                  maxlength="240"
-                  placeholder="Write a favorite line or a note from tonight..."
-                  class="w-full px-3 py-2 rounded-xl bg-black/50 border border-white/10 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-amber-400/60 resize-none"
-                ></textarea>
-              </div>
-
-              <button
-                id="submitMyRatingBtn"
-                type="button"
-                class="w-full py-2.5 rounded-xl bg-rose-500 hover:bg-rose-400 text-white font-semibold text-xs transition cursor-pointer"
-              >
-                Submit My Rating
-              </button>
-
-              <!-- Side-by-Side Live Comparison Box -->
-              <div id="liveRatingComparisonBox" class="hidden pt-2 border-t border-white/10 space-y-2.5">
-                <div class="flex items-center justify-between">
-                  <span class="text-[11px] uppercase tracking-wider text-gray-400 font-semibold">Live Couple Score</span>
-                  <span id="coupleAverageBadge" class="px-2.5 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 font-mono text-xs font-bold">-- ★</span>
-                </div>
-                <div id="sideBySideRatingsGrid" class="grid grid-cols-2 gap-2"></div>
-                <button
-                  id="stampPassportBtn"
-                  type="button"
-                  class="w-full py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-rose-500 hover:from-amber-400 hover:to-rose-400 text-obsidian font-bold text-xs shadow-lg transition cursor-pointer"
-                >
-                  Stamp into Shared Movie Passport ✨
-                </button>
-              </div>
+              <button type="button" data-nav-view="passport" class="app-nav-link w-full h-10 rounded-[6px] bg-surface-control hover:bg-surface-variant border border-hairline-border text-text-primary font-title-sm text-title-sm transition-colors cursor-pointer">View full passport</button>
             </div>
-
-            <!-- Shared Movie Passport Timeline -->
-            <div class="space-y-2.5">
-              <div class="flex items-center justify-between text-[11px] text-gray-400">
-                <span>Stamped Memories</span>
-                <span id="passportCountBadge" class="font-mono text-amber-400">0 films</span>
-              </div>
-              <div id="passportTimelineList" class="space-y-2.5 max-h-80 overflow-y-auto pr-1">
-                <div class="rounded-xl border border-dashed border-white/10 p-4 text-center text-xs text-gray-500">
-                  Your passport is ready for its first stamp! Tap <strong class="text-amber-400">★ Rate Movie Together</strong> after watching.
-                </div>
-              </div>
-            <!-- Memories Backup: JSONL Export / Import -->
-            <div class="pt-3 border-t border-white/10 space-y-2">
-              <p class="text-[11px] text-gray-400 leading-relaxed">Memories live on this device + your .jsonl file — no cloud yet. Download the file to keep them safe, or load one to restore them.</p>
-              <div class="flex gap-2">
-                <button id="exportLogBtn" type="button" class="flex-1 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-gray-200 font-semibold text-xs transition cursor-pointer">⬇ Download memories (.jsonl)</button>
-                <label class="flex-1 py-2.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-200 font-semibold text-xs transition cursor-pointer flex items-center justify-center text-center">
-                  📂 Load memories file
-                  <input id="passportImportInput" type="file" accept=".jsonl,application/json" class="hidden" />
-                </label>
-              </div>
-            </div>
-            </div>
-          </section>
-
+          </div>
         </div>
+      </div>
+
+      <!-- Below-stage strip: real rating / passport / memories cards -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+        <div class="bg-surface-card border border-hairline-border rounded-[10px] p-4 flex flex-col gap-2">
+          <p class="font-label-sm text-label-sm text-text-muted uppercase tracking-wider">Your Rating</p>
+          <h3 class="font-headline-md text-headline-md text-text-primary">Rate this movie together</h3>
+          <p class="font-body-sm text-body-sm text-text-secondary leading-relaxed">Score it, tag the vibe, and stamp the night into your passport.</p>
+          <div class="mt-auto pt-2">
+            <button id="toggleRatePanelBtn" type="button" class="h-10 px-4 rounded-[6px] bg-primary-container hover:bg-primary text-canvas-background font-title-sm text-title-sm transition-colors cursor-pointer">★ Rate Movie Together</button>
+          </div>
+        </div>
+        <div class="bg-surface-card border border-hairline-border rounded-[10px] p-4 flex flex-col gap-2">
+          <p class="font-label-sm text-label-sm text-text-muted uppercase tracking-wider">Shared Passport</p>
+          <h3 class="font-headline-md text-headline-md text-text-primary">Your stamped films</h3>
+          <p class="font-body-sm text-body-sm text-text-secondary leading-relaxed">Every film you watch together, with both scores and the line you kept.</p>
+          <div class="mt-auto pt-2">
+            <button type="button" data-nav-view="passport" class="app-nav-link h-10 px-4 rounded-[6px] bg-surface-control hover:bg-surface-variant border border-hairline-border text-text-primary font-title-sm text-title-sm transition-colors cursor-pointer">View full passport</button>
+          </div>
+        </div>
+        <div class="bg-surface-card border border-hairline-border rounded-[10px] p-4 flex flex-col gap-2">
+          <p class="font-label-sm text-label-sm text-text-muted uppercase tracking-wider">Memories</p>
+          <h3 class="font-headline-md text-headline-md text-text-primary">Your memories file</h3>
+          <p class="font-body-sm text-body-sm text-text-secondary leading-relaxed">Memories live on this device + your .jsonl file — no cloud yet. Download the file to keep them safe, or load one to restore them.</p>
+          <div class="mt-auto pt-2 flex flex-wrap gap-2">
+            <button id="exportLogBtn" type="button" class="h-10 px-4 rounded-[6px] bg-surface-control hover:bg-surface-variant border border-hairline-border text-text-primary font-title-sm text-title-sm transition-colors cursor-pointer flex items-center gap-1.5">
+              <span class="material-symbols-outlined text-[16px] text-text-secondary">&#xF090;</span>Download memories (.jsonl)
+            </button>
+            <label class="h-10 px-4 rounded-[6px] bg-primary-container/15 hover:bg-primary-container/25 border border-primary-container/30 text-primary-container font-title-sm text-title-sm transition-colors cursor-pointer flex items-center justify-center gap-1.5">
+              <span class="material-symbols-outlined text-[16px]">&#xE2C8;</span>Load memories file
+              <input id="passportImportInput" type="file" accept=".jsonl,application/json" class="hidden" />
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <footer class="border-t border-hairline-border mt-8 pt-4 pb-2 flex flex-wrap items-center justify-between gap-2">
+        <p class="font-body-sm text-body-sm text-text-muted">Cinema for Two — Private synchronous screening suite.</p>
+        <p class="font-label-sm text-label-sm text-text-muted uppercase tracking-wider">Peer-to-peer · No cloud · Memories on this device</p>
+      </footer>
+    </div>
+  </div>
+
+  <!-- ======================================================================
+       VIEW 2: PRE-SHOW LOUNGE — live camera tiles, call controls, source
+       picker (YouTube URL / Direct link / Local file / Sample Clips only —
+       the removed v3 options stay removed).
+       ====================================================================== -->
+  <div id="loungeView" class="hidden min-h-screen flex flex-col">
+    <div class="w-full max-w-[880px] mx-auto px-gutter md:px-margin-desktop pt-28 lg:pt-16 pb-12 flex-1">
+      <div class="text-center mb-6">
+        <p class="font-label-sm text-label-sm text-text-muted uppercase tracking-wider mb-2">Pre-Show Lounge</p>
+        <h2 class="font-headline-md text-display-lg-mobile sm:text-display-lg text-text-primary tracking-tight">Face to face before the film</h2>
+        <p id="loungeStatus" class="font-body-sm text-body-sm text-text-secondary mt-2">Waiting for your partner to join the room…</p>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+        <div class="relative rounded-[10px] overflow-hidden bg-black border border-hairline-border aspect-video">
+          <video id="loungeLocalVideo" autoplay muted playsinline class="w-full h-full object-cover"></video>
+          <span id="loungeLocalName" class="absolute bottom-2 left-2 px-2 py-1 rounded bg-canvas-background/70 text-xs text-text-primary flex items-center gap-1.5">
+            <span class="w-1.5 h-1.5 rounded-full bg-presence-indicator"></span>You
+          </span>
+          <span id="loungeMicBadge" class="hidden absolute top-2 right-2 px-2 py-0.5 rounded bg-canvas-background/70 text-[10px] font-code-timecode uppercase tracking-wider text-error flex items-center gap-1">
+            <span class="material-symbols-outlined text-[12px]">&#xE02B;</span>Muted
+          </span>
+        </div>
+        <div class="relative rounded-[10px] overflow-hidden bg-black border border-hairline-border aspect-video">
+          <video id="loungePartnerVideo" autoplay playsinline class="w-full h-full object-cover"></video>
+          <span id="loungePartnerName" class="absolute bottom-2 left-2 px-2 py-1 rounded bg-canvas-background/70 text-xs text-text-primary flex items-center gap-1.5">
+            <span class="w-1.5 h-1.5 rounded-full bg-text-muted"></span>Partner
+          </span>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-center mb-6">
+        <div class="flex items-center gap-1 bg-surface-card border border-hairline-border rounded-full px-2 py-2">
+          <button id="loungeMicBtn" type="button" title="Mute / Unmute" class="w-10 h-10 rounded-full flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-surface-control transition-colors cursor-pointer">
+            <span id="loungeMicIcon" class="material-symbols-outlined text-[20px]">&#xE31D;</span>
+          </button>
+          <button id="loungeCamBtn" type="button" title="Turn camera on / off" class="w-10 h-10 rounded-full flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-surface-control transition-colors cursor-pointer">
+            <span id="loungeCamIcon" class="material-symbols-outlined text-[20px]">&#xE04B;</span>
+          </button>
+          <div class="w-px h-6 bg-hairline-border mx-1"></div>
+          <button id="loungeEndBtn" type="button" title="End call" class="w-10 h-10 rounded-full flex items-center justify-center text-text-secondary hover:text-on-error-container hover:bg-error-container transition-colors cursor-pointer">
+            <span class="material-symbols-outlined text-[20px]">&#xF0BC;</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="flex flex-col items-center gap-3 mb-6">
+        <button id="loungeStartBtn" type="button" class="h-10 px-6 rounded-[6px] bg-primary-container hover:bg-primary text-canvas-background font-bold text-sm transition cursor-pointer">Start watching together</button>
+        <button id="loungeNoVideoBtn" type="button" class="text-xs text-text-muted hover:text-text-secondary underline underline-offset-2 cursor-pointer">Skip video — watch without camera</button>
+      </div>
+
+      <!-- Source picker -->
+      <div class="bg-surface-card border border-hairline-border rounded-[10px] p-4 space-y-4">
+        <div>
+          <p class="font-label-sm text-label-sm text-text-muted uppercase tracking-wider mb-1">Choose what to watch</p>
+          <p class="font-body-sm text-body-sm text-text-secondary">Pick a source — it syncs to your partner automatically.</p>
+        </div>
+        <div class="flex items-center gap-1 bg-canvas-background p-1 rounded-[6px] border border-hairline-border w-full sm:w-auto">
+          <button type="button" data-source-tab="url" class="source-tab-btn flex-1 sm:flex-initial px-3 py-2 rounded-[6px] text-xs font-semibold transition bg-surface-control text-text-primary cursor-pointer flex items-center justify-center gap-1.5">
+            <span class="material-symbols-outlined text-[14px]">&#xE250;</span>Video URL
+          </button>
+          <button type="button" data-source-tab="local" class="source-tab-btn flex-1 sm:flex-initial px-3 py-2 rounded-[6px] text-xs font-semibold transition text-text-secondary hover:text-text-primary cursor-pointer flex items-center justify-center gap-1.5">
+            <span class="material-symbols-outlined text-[14px]">&#xE9FC;</span>Local File
+          </button>
+          <button type="button" data-source-tab="samples" class="source-tab-btn flex-1 sm:flex-initial px-3 py-2 rounded-[6px] text-xs font-semibold transition text-text-secondary hover:text-text-primary cursor-pointer flex items-center justify-center gap-1.5">
+            <span class="material-symbols-outlined text-[14px]">&#xE1C4;</span>Sample Clips
+          </button>
+        </div>
+
+        <div id="tabPanel-url" class="source-tab-panel">
+          <form id="urlLoadForm" class="flex gap-2">
+            <input
+              id="videoUrlInput"
+              type="text"
+              placeholder="Paste a YouTube or video link…"
+              class="flex-1 min-w-0 px-3.5 h-10 rounded-[6px] bg-canvas-background border border-hairline-border text-sm text-text-primary placeholder-text-muted focus:outline-none focus:border-primary-container/60"
+            />
+            <button type="submit" class="h-10 px-4 rounded-[6px] bg-primary-container hover:bg-primary text-canvas-background font-semibold text-sm transition cursor-pointer shrink-0">Load Screening</button>
+          </form>
+          <p class="text-[11px] text-text-muted mt-2 leading-relaxed">YouTube links play in the synced player; direct .mp4 / .webm links play natively.</p>
+        </div>
+
+        <div id="tabPanel-local" class="source-tab-panel hidden">
+          <label class="flex items-center justify-center gap-2 w-full h-10 rounded-[6px] bg-surface-control hover:bg-surface-variant border border-hairline-border text-text-primary text-sm font-medium cursor-pointer">
+            <span class="material-symbols-outlined text-[16px] text-text-secondary">&#xE9FC;</span>Choose a video file
+            <input id="localFileInput" type="file" accept="video/*" class="hidden" />
+          </label>
+          <div id="localFileSelectedBadge" class="hidden mt-2 text-xs text-presence-indicator flex items-center gap-2 bg-presence-indicator/10 border border-presence-indicator/20 rounded-[6px] px-3 py-1.5">
+            <span>Loaded locally:</span>
+            <span id="localFileNameDisplay" class="font-code-timecode truncate"></span>
+          </div>
+          <p id="partnerLocalFileHint" class="text-[11px] text-text-muted mt-2 leading-relaxed">Your partner needs the same file on their device — pick it on both sides and playback stays in sync.</p>
+        </div>
+
+        <div id="tabPanel-samples" class="source-tab-panel hidden">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            <button
+              type="button"
+              data-sample-url="https://www.youtube.com/watch?v=aqz-KE-bpKQ"
+              data-sample-title="Big Buck Bunny — Animated Short (HD)"
+              class="sample-clip-btn text-left p-3 rounded-[6px] bg-canvas-background hover:bg-surface-control border border-hairline-border hover:border-primary-container/40 transition flex items-center gap-3 cursor-pointer"
+            >
+              <span class="w-10 h-10 rounded-[6px] bg-primary-container/15 text-primary-container flex items-center justify-center shrink-0">
+                <span class="material-symbols-outlined text-[20px]">&#xE1C4;</span>
+              </span>
+              <div class="min-w-0">
+                <p class="text-xs font-semibold text-text-primary truncate">Big Buck Bunny (HD Short)</p>
+                <p class="text-[11px] text-text-muted truncate">Instant sync test • Open-source cinema</p>
+              </div>
+            </button>
+            <button
+              type="button"
+              data-sample-url="https://www.youtube.com/watch?v=eRsGyueVLvQ"
+              data-sample-title="Sintel — Fantasy Short Film"
+              class="sample-clip-btn text-left p-3 rounded-[6px] bg-canvas-background hover:bg-surface-control border border-hairline-border hover:border-primary-container/40 transition flex items-center gap-3 cursor-pointer"
+            >
+              <span class="w-10 h-10 rounded-[6px] bg-primary-container/15 text-primary-container flex items-center justify-center shrink-0">
+                <span class="material-symbols-outlined text-[20px]">&#xE1C4;</span>
+              </span>
+              <div class="min-w-0">
+                <p class="text-xs font-semibold text-text-primary truncate">Sintel — Fantasy Short Film</p>
+                <p class="text-[11px] text-text-muted truncate">Atmospheric adventure • Blender Studio</p>
+              </div>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <footer class="border-t border-hairline-border mt-8 pt-4 pb-2 flex flex-wrap items-center justify-between gap-2">
+        <p class="font-body-sm text-body-sm text-text-muted">Cinema for Two — Private synchronous screening suite.</p>
+        <p class="font-label-sm text-label-sm text-text-muted uppercase tracking-wider">Peer-to-peer · No cloud · Memories on this device</p>
+      </footer>
+    </div>
+  </div>
+
+  <!-- ======================================================================
+       VIEW 3: SHARED MOVIE PASSPORT — full archive view.
+       Title-led text cards (the app has no poster images — none invented).
+       Count + average are real, computed from the log.
+       ====================================================================== -->
+  <div id="passportView" class="hidden min-h-screen flex flex-col">
+    <div class="w-full px-gutter md:px-margin-desktop pt-28 lg:pt-16 pb-12 flex-1">
+      <div class="flex flex-wrap items-end justify-between gap-space-md border-b border-hairline-border pb-space-md">
+        <div class="flex flex-col gap-space-xs">
+          <p class="font-label-sm text-label-sm text-text-muted uppercase tracking-wider">Archive · Vol. I</p>
+          <h1 class="font-headline-md text-display-lg-mobile sm:text-display-lg italic text-text-primary tracking-tight">Shared Movie Passport</h1>
+        </div>
+        <div class="flex items-center gap-2 font-code-timecode text-code-timecode text-text-secondary uppercase tracking-wider">
+          <span id="passportViewCount">0 films</span>
+          <span class="text-text-muted">·</span>
+          <span id="passportViewAvg">— avg score</span>
+        </div>
+      </div>
+
+      <div id="passportGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-6"></div>
+      <div id="passportEmpty" class="mt-6 rounded-[10px] border border-dashed border-hairline-border p-8 text-center font-body-sm text-body-sm text-text-muted">
+        No films stamped yet — watch something together, rate it, and stamp it here.
+      </div>
+
+      <footer class="border-t border-hairline-border mt-8 pt-4 pb-2 flex flex-wrap items-center justify-between gap-2">
+        <p class="font-body-sm text-body-sm text-text-muted">Cinema for Two — Private synchronous screening suite.</p>
+        <p class="font-label-sm text-label-sm text-text-muted uppercase tracking-wider">Peer-to-peer · No cloud · Memories on this device</p>
+      </footer>
+    </div>
+  </div>
+
+  <!-- ======================================================================
+       FLOATING PiP — draggable call dock (Stitch dock styling, app behavior:
+       drag anywhere, Corner cycles corners, Mic/Cam/Hide/End).
+       ====================================================================== -->
+  <div id="callPip" class="hidden fixed z-50 w-56 sm:w-64 rounded-[8px] overflow-hidden bg-surface-card border border-hairline-border" style="right:12px;bottom:12px;touch-action:none;">
+    <div class="flex items-center justify-between px-2.5 py-1.5 cursor-grab active:cursor-grabbing select-none">
+      <span id="pipPartnerName" class="text-xs font-semibold text-text-secondary truncate">Partner</span>
+      <span class="text-[10px] font-code-timecode uppercase tracking-wider text-text-muted">Drag</span>
+    </div>
+    <div class="relative aspect-video bg-black">
+      <video id="pipPartnerVideo" autoplay playsinline class="w-full h-full object-cover"></video>
+      <video id="pipLocalVideo" autoplay muted playsinline class="absolute bottom-1.5 right-1.5 w-16 sm:w-20 aspect-video object-cover rounded border border-hairline-border bg-black"></video>
+    </div>
+    <div class="flex items-center justify-center gap-1 px-2 py-1.5 border-t border-hairline-border">
+      <button id="pipMicBtn" type="button" class="px-2 py-1 rounded-[6px] bg-surface-control hover:bg-surface-variant text-text-primary text-[11px] font-semibold cursor-pointer">Mic</button>
+      <button id="pipCamBtn" type="button" class="px-2 py-1 rounded-[6px] bg-surface-control hover:bg-surface-variant text-text-primary text-[11px] font-semibold cursor-pointer">Cam</button>
+      <button id="pipCornerBtn" type="button" class="px-2 py-1 rounded-[6px] bg-surface-control hover:bg-surface-variant text-text-primary text-[11px] font-semibold cursor-pointer">Corner</button>
+      <button id="pipHideBtn" type="button" class="px-2 py-1 rounded-[6px] bg-surface-control hover:bg-surface-variant text-text-primary text-[11px] font-semibold cursor-pointer">Hide</button>
+      <button id="pipEndBtn" type="button" class="px-2 py-1 rounded-[6px] bg-error-container hover:bg-error text-on-error-container text-[11px] font-semibold cursor-pointer">End</button>
+    </div>
+  </div>
+
+  <!-- ======================================================================
+       RATE MOVIE PANEL — overlay card (opened from the theater card or the
+       rail Passport tab). Same flow: stars, vibes, note, submit, compare,
+       stamp into the passport.
+       ====================================================================== -->
+  <div id="rateMoviePanel" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-canvas-background/90">
+    <div class="w-full max-w-md bg-surface-card border border-hairline-border rounded-[10px] p-4 space-y-3.5 max-h-[90vh] overflow-y-auto no-scrollbar">
+      <div class="flex items-center justify-between">
+        <span class="font-label-sm text-label-sm text-primary-container uppercase tracking-wider">Tonight's Feature</span>
+        <button id="closeRatePanelBtn" type="button" class="text-xs text-text-muted hover:text-text-primary cursor-pointer flex items-center gap-1">
+          Close <span class="material-symbols-outlined text-[14px]">&#xE5CD;</span>
+        </button>
+      </div>
+
+      <div>
+        <label class="block text-[11px] text-text-muted mb-1">Movie / Video Title</label>
+        <input
+          id="ratingMovieTitleInput"
+          type="text"
+          placeholder="Enter movie title..."
+          class="w-full px-3 py-2 rounded-[6px] bg-canvas-background border border-hairline-border text-xs sm:text-sm text-text-primary placeholder-text-muted focus:outline-none focus:border-primary-container/60"
+        />
+      </div>
+
+      <div>
+        <div class="flex items-center justify-between mb-1.5">
+          <label class="text-[11px] text-text-muted">Your Star Rating (tap left/right half)</label>
+          <span id="myRatingNumeric" class="font-code-timecode text-code-timecode font-bold text-primary-container">4.5 / 5.0 ★</span>
+        </div>
+        <div id="starSelectorContainer" class="flex items-center gap-1.5"></div>
+      </div>
+
+      <div>
+        <label class="block text-[11px] text-text-muted mb-1.5">Vibe Tags</label>
+        <div id="vibeTagsContainer" class="flex flex-wrap gap-1.5">
+          <button type="button" data-vibe="Cozy" class="vibe-tag-btn px-2.5 py-1 rounded-full text-[11px] border border-hairline-border bg-surface-control text-text-secondary transition cursor-pointer">Cozy</button>
+          <button type="button" data-vibe="Tearjerker" class="vibe-tag-btn px-2.5 py-1 rounded-full text-[11px] border border-hairline-border bg-surface-control text-text-secondary transition cursor-pointer">Tearjerker</button>
+          <button type="button" data-vibe="Hilarious" class="vibe-tag-btn px-2.5 py-1 rounded-full text-[11px] border border-hairline-border bg-surface-control text-text-secondary transition cursor-pointer">Hilarious</button>
+          <button type="button" data-vibe="Thriller" class="vibe-tag-btn px-2.5 py-1 rounded-full text-[11px] border border-hairline-border bg-surface-control text-text-secondary transition cursor-pointer">Thriller</button>
+          <button type="button" data-vibe="Romantic" class="vibe-tag-btn px-2.5 py-1 rounded-full text-[11px] border border-hairline-border bg-surface-control text-text-secondary transition cursor-pointer">Romantic</button>
+          <button type="button" data-vibe="Rewatch Worthy" class="vibe-tag-btn px-2.5 py-1 rounded-full text-[11px] border border-hairline-border bg-surface-control text-text-secondary transition cursor-pointer">Rewatch Worthy</button>
+        </div>
+      </div>
+
+      <div>
+        <label class="block text-[11px] text-text-muted mb-1">Favorite Quote or Memory Note</label>
+        <textarea
+          id="ratingNoteInput"
+          rows="2"
+          maxlength="240"
+          placeholder="Write a favorite line or a note from tonight..."
+          class="w-full px-3 py-2 rounded-[6px] bg-canvas-background border border-hairline-border text-xs text-text-primary placeholder-text-muted focus:outline-none focus:border-primary-container/60 resize-none"
+        ></textarea>
+      </div>
+
+      <button
+        id="submitMyRatingBtn"
+        type="button"
+        class="w-full py-2.5 rounded-[6px] bg-primary-container hover:bg-primary text-canvas-background font-semibold text-xs transition cursor-pointer"
+      >Submit My Rating</button>
+
+      <div id="liveRatingComparisonBox" class="hidden pt-2 border-t border-hairline-border space-y-2.5">
+        <div class="flex items-center justify-between">
+          <span class="text-[11px] uppercase tracking-wider text-text-muted font-semibold">Live Couple Score</span>
+          <span id="coupleAverageBadge" class="px-2.5 py-0.5 rounded-full bg-primary-container/15 border border-primary-container/30 text-primary-container font-code-timecode text-code-timecode font-bold">-- ★</span>
+        </div>
+        <div id="sideBySideRatingsGrid" class="grid grid-cols-2 gap-2"></div>
+        <button
+          id="stampPassportBtn"
+          type="button"
+          class="w-full py-2.5 rounded-[6px] bg-primary-container hover:bg-primary text-canvas-background font-bold text-xs transition cursor-pointer"
+        >Stamp into Shared Movie Passport</button>
       </div>
     </div>
   </div>
 
-  <!-- =====================================================================
-       APPLICATION LOGIC — PEERJS LIVE SYNC + JSONL MEMORIES
-  ====================================================================== -->
   <script>
 // =========================================================================
 // Cinema for Two — PeerJS live sync + JSONL memories (no backend, no accounts)
@@ -888,7 +924,7 @@
 // =========================================================================
 
 const PEERJS_HOST_PREFIX = 'c2t-';
-const APP_VERSION = '2.0.0'; // v2: voice & video calling, lounge, floating PiP
+const APP_VERSION = '2.1.0'; // v2.1: Stitch reskin (DESIGN.md) — same v2 calling/lounge/PiP, new visual system
 // ICE servers: Google + Cloudflare STUN for direct links, PeerJS's own
 // TURN (its built-in default, which a custom config otherwise discards)
 // as the relay fallback. Open Relay was dropped 22 Nov 2026: its TLS
@@ -982,6 +1018,7 @@ const dom = {
   welcomeImportInput: document.getElementById('welcomeImportInput'),
   welcomeImportStatus: document.getElementById('welcomeImportStatus'),
   leaveRoomBtn: document.getElementById('leaveRoomBtn'),
+  appHeader: document.getElementById('appHeader'),
   loungeView: document.getElementById('loungeView'),
   loungeLocalVideo: document.getElementById('loungeLocalVideo'),
   loungePartnerVideo: document.getElementById('loungePartnerVideo'),
@@ -992,6 +1029,10 @@ const dom = {
   loungeMicBtn: document.getElementById('loungeMicBtn'),
   loungeStartBtn: document.getElementById('loungeStartBtn'),
   loungeNoVideoBtn: document.getElementById('loungeNoVideoBtn'),
+  loungeEndBtn: document.getElementById('loungeEndBtn'),
+  loungeMicBadge: document.getElementById('loungeMicBadge'),
+  loungeMicIcon: document.getElementById('loungeMicIcon'),
+  loungeCamIcon: document.getElementById('loungeCamIcon'),
   callPip: document.getElementById('callPip'),
   pipPartnerVideo: document.getElementById('pipPartnerVideo'),
   pipLocalVideo: document.getElementById('pipLocalVideo'),
@@ -1008,6 +1049,7 @@ const dom = {
   presenceText: document.getElementById('presenceText'),
   syncIndicatorText: document.getElementById('syncIndicatorText'),
   roomCodeBadge: document.getElementById('roomCodeBadge'),
+  copyRoomCodeBtn: document.getElementById('copyRoomCodeBtn'),
   copyInviteBtn: document.getElementById('copyInviteBtn'),
   videoUrlInput: document.getElementById('videoUrlInput'),
   urlLoadForm: document.getElementById('urlLoadForm'),
@@ -1070,6 +1112,14 @@ const dom = {
   stampPassportBtn: document.getElementById('stampPassportBtn'),
   passportCountBadge: document.getElementById('passportCountBadge'),
   passportTimelineList: document.getElementById('passportTimelineList'),
+  passportView: document.getElementById('passportView'),
+  passportGrid: document.getElementById('passportGrid'),
+  passportEmpty: document.getElementById('passportEmpty'),
+  passportViewCount: document.getElementById('passportViewCount'),
+  passportViewAvg: document.getElementById('passportViewAvg'),
+  railPassportPane: document.getElementById('railPassportPane'),
+  theaterRail: document.getElementById('theaterRail'),
+  railHeader: document.getElementById('railHeader'),
   exportLogBtn: document.getElementById('exportLogBtn'),
   passportImportInput: document.getElementById('passportImportInput'),
   toastContainer: document.getElementById('toastContainer'),
@@ -1083,12 +1133,12 @@ function showToast(message, variant = 'gold', onClick = null, durationMs = 3200)
   const el = document.createElement('div');
   const borderClass =
     variant === 'rose'
-      ? 'border-rose-500/45 bg-[#1a1019]/95 text-rose-100'
+      ? 'border-error/45 bg-surface-card text-error'
       : variant === 'emerald'
-      ? 'border-emerald-500/45 bg-[#0e1b18]/95 text-emerald-100'
-      : 'border-amber-500/45 bg-[#171410]/95 text-amber-100';
+      ? 'border-presence-indicator/45 bg-surface-card text-presence-indicator'
+      : 'border-primary-container/45 bg-surface-card text-primary-container';
 
-  el.className = `pointer-events-auto px-4 py-2.5 rounded-full border ${borderClass} backdrop-blur-md shadow-xl text-xs sm:text-sm font-medium flex items-center gap-2 transition-all duration-300 transform -translate-y-2 opacity-0`;
+  el.className = `pointer-events-auto px-4 py-2.5 rounded-full border ${borderClass} text-xs sm:text-sm font-medium flex items-center gap-2 transition-all duration-300 transform -translate-y-2 opacity-0`;
   el.textContent = message;
   if (onClick) {
     el.style.cursor = 'pointer';
@@ -1708,11 +1758,17 @@ function nextPipCorner(i) {
   return ((i || 0) + 1) % PIP_CORNERS.length;
 }
 
+// v2.1: the lounge mic/cam controls are icon buttons now (Material Symbols
+// in #loungeMicIcon / #loungeCamIcon), so update the icon glyphs instead of
+// the button text. Off state turns the icon red and shows the MUTED badge.
 function updateCallButtons() {
-  const camLabel = state.camOn ? 'Camera on' : 'Camera off';
-  const micLabel = state.micOn ? 'Mic on' : 'Muted';
-  if (dom.loungeCamBtn) dom.loungeCamBtn.textContent = camLabel;
-  if (dom.loungeMicBtn) dom.loungeMicBtn.textContent = micLabel;
+  // PUA codepoints in the self-hosted Material Symbols subset font.
+  const MIC_ON = '\uE31D', MIC_OFF = '\uE02B', CAM_ON = '\uE04B', CAM_OFF = '\uE04C';
+  if (dom.loungeMicIcon) dom.loungeMicIcon.textContent = state.micOn ? MIC_ON : MIC_OFF;
+  if (dom.loungeCamIcon) dom.loungeCamIcon.textContent = state.camOn ? CAM_ON : CAM_OFF;
+  if (dom.loungeMicIcon) dom.loungeMicIcon.classList.toggle('text-error', !state.micOn);
+  if (dom.loungeCamIcon) dom.loungeCamIcon.classList.toggle('text-error', !state.camOn);
+  if (dom.loungeMicBadge) dom.loungeMicBadge.classList.toggle('hidden', state.micOn);
   if (dom.pipCamBtn) dom.pipCamBtn.textContent = state.camOn ? 'Cam' : 'Cam off';
   if (dom.pipMicBtn) dom.pipMicBtn.textContent = state.micOn ? 'Mic' : 'Muted';
 }
@@ -1860,6 +1916,8 @@ function enterLounge() {
   state.inLounge = true;
   if (dom.loungeView) dom.loungeView.classList.remove('hidden');
   if (dom.theaterView) dom.theaterView.classList.add('hidden');
+  if (dom.passportView) dom.passportView.classList.add('hidden');
+  setNavActive('lounge');
   updateLoungeStatus();
   updateCallButtons();
 }
@@ -1868,7 +1926,35 @@ function exitLoungeToTheater() {
   state.inLounge = false;
   if (dom.loungeView) dom.loungeView.classList.add('hidden');
   if (dom.theaterView) dom.theaterView.classList.remove('hidden');
+  if (dom.passportView) dom.passportView.classList.add('hidden');
+  setNavActive('theater');
   if (state.remoteStream || state.localStream) showPip(true);
+}
+
+// v2.1: top-nav view switching (Screening Room / Pre-Show Lounge / Shared
+// Passport). The passport view is a real view over the same log data.
+function setNavActive(view) {
+  document.querySelectorAll('.app-nav-link').forEach((a) => {
+    const active = a.dataset.navView === view;
+    a.classList.toggle('app-nav-active', active);
+    if (active) a.setAttribute('aria-current', 'page');
+    else a.removeAttribute('aria-current');
+  });
+}
+
+function showAppView(view) {
+  if (!state.roomCode) return;
+  if (view === 'lounge') { enterLounge(); return; }
+  if (view === 'theater') { exitLoungeToTheater(); return; }
+  if (view === 'passport') {
+    state.inLounge = false;
+    if (dom.loungeView) dom.loungeView.classList.add('hidden');
+    if (dom.theaterView) dom.theaterView.classList.add('hidden');
+    if (dom.passportView) dom.passportView.classList.remove('hidden');
+    renderPassportTimeline(state.roomData ? state.roomData.passport : []);
+    setNavActive('passport');
+    window.scrollTo(0, 0);
+  }
 }
 
 // --- Floating Picture-in-Picture overlay ---------------------------------
@@ -2099,16 +2185,16 @@ function updatePartnerPresenceUI() {
   const now = Date.now();
   const away = state.peerConnected && state.lastPongAt && (now - state.lastPongAt > 45000);
   if (state.peerConnected && state.partnerName && !away) {
-    dom.presenceBadge.className = 'flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/15 border border-emerald-500/35 text-xs font-medium text-emerald-200';
-    dom.presenceDot.className = 'w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse';
+    dom.presenceBadge.className = 'flex items-center gap-2 px-3 py-1.5 rounded-full bg-presence-indicator/10 border border-presence-indicator/25 text-xs font-medium text-presence-indicator';
+    dom.presenceDot.className = 'w-2 h-2 rounded-full bg-presence-indicator animate-pulse';
     dom.presenceText.textContent = `Watching with ${state.partnerName}`;
   } else if (state.peerConnected && state.partnerName && away) {
-    dom.presenceBadge.className = 'flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/25 text-xs font-medium text-amber-200';
-    dom.presenceDot.className = 'w-2.5 h-2.5 rounded-full bg-amber-400';
+    dom.presenceBadge.className = 'flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary-container/10 border border-primary-container/25 text-xs font-medium text-primary-container';
+    dom.presenceDot.className = 'w-2 h-2 rounded-full bg-primary-container';
     dom.presenceText.textContent = `${state.partnerName} stepped away...`;
   } else {
-    dom.presenceBadge.className = 'flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/25 text-xs font-medium text-amber-200';
-    dom.presenceDot.className = 'w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse';
+    dom.presenceBadge.className = 'flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary-container/10 border border-primary-container/25 text-xs font-medium text-primary-container';
+    dom.presenceDot.className = 'w-2 h-2 rounded-full bg-primary-container animate-pulse';
     dom.presenceText.textContent = 'Waiting for partner to join...';
   }
 }
@@ -2124,14 +2210,14 @@ function updateSyncIndicator() {
   if (!el) return;
   const live = state.peerConnected || state.peerRegistered;
   if (live) {
-    el.className = 'hidden sm:inline-flex items-center gap-1.5 text-[11px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-full';
-    el.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>Live Synced';
+    el.className = 'hidden sm:inline-flex items-center gap-1.5 text-[11px] text-presence-indicator bg-presence-indicator/10 border border-presence-indicator/20 px-2.5 py-1 rounded-full';
+    el.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-presence-indicator"></span>Live Synced';
   } else if (state.syncOffline) {
-    el.className = 'hidden sm:inline-flex items-center gap-1.5 text-[11px] text-rose-400 bg-rose-500/10 border border-rose-500/20 px-2.5 py-1 rounded-full';
-    el.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-rose-400"></span>Sync Offline';
+    el.className = 'hidden sm:inline-flex items-center gap-1.5 text-[11px] text-error bg-error-container/30 border border-error/20 px-2.5 py-1 rounded-full';
+    el.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-error"></span>Sync Offline';
   } else {
-    el.className = 'hidden sm:inline-flex items-center gap-1.5 text-[11px] text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2.5 py-1 rounded-full';
-    el.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>Connecting…';
+    el.className = 'hidden sm:inline-flex items-center gap-1.5 text-[11px] text-primary-container bg-primary-container/10 border border-primary-container/20 px-2.5 py-1 rounded-full';
+    el.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-primary-container animate-pulse"></span>Connecting…';
   }
   updateDebugPanel();
 }
@@ -2160,7 +2246,7 @@ function updateDebugPanel() {
   if (!el) {
     el = document.createElement('div');
     el.id = 'debugPanel';
-    el.style.cssText = 'position:fixed;left:8px;right:8px;bottom:8px;z-index:9999;background:rgba(0,0,0,0.88);color:#a7f3d0;font:11px/1.5 monospace;padding:8px 10px;border:1px solid #065f46;border-radius:8px;white-space:pre-wrap;word-break:break-all;';
+    el.style.cssText = 'position:fixed;left:8px;right:8px;bottom:8px;z-index:9999;background:#141417;color:#9A9891;font:11px/1.5 monospace;padding:8px 10px;border:1px solid rgba(255,255,255,0.08);border-radius:10px;white-space:pre-wrap;word-break:break-all;';
     document.body.appendChild(el);
     debugPanelEl = el;
     // Also expose live state for anyone with DevTools open.
@@ -2463,7 +2549,7 @@ function updateTimelineUI() {
     dom.timelineScrubber.max = dur;
     dom.timelineScrubber.value = cur;
     const pct = Math.min(100, (cur / dur) * 100);
-    dom.timelineScrubber.style.background = `linear-gradient(to right, #f59e0b ${pct}%, rgba(255,255,255,0.16) ${pct}%)`;
+    dom.timelineScrubber.style.background = `linear-gradient(to right, #E5A93C ${pct}%, rgba(255,255,255,0.16) ${pct}%)`;
   }
 }
 
@@ -2676,8 +2762,8 @@ function switchSourceTab(tabKey) {
   document.querySelectorAll('.source-tab-btn').forEach((btn) => {
     const active = btn.dataset.sourceTab === tabKey;
     btn.className = active
-      ? 'source-tab-btn flex-1 sm:flex-initial px-3 py-2 rounded-lg text-xs font-semibold transition bg-amber-500 text-obsidian cursor-pointer'
-      : 'source-tab-btn flex-1 sm:flex-initial px-3 py-2 rounded-lg text-xs font-semibold transition text-gray-300 hover:text-white cursor-pointer';
+      ? 'source-tab-btn flex-1 sm:flex-initial px-3 py-2 rounded-[6px] text-xs font-semibold transition bg-surface-control text-text-primary cursor-pointer flex items-center justify-center gap-1.5'
+      : 'source-tab-btn flex-1 sm:flex-initial px-3 py-2 rounded-[6px] text-xs font-semibold transition text-text-secondary hover:text-text-primary cursor-pointer flex items-center justify-center gap-1.5';
   });
   document.querySelectorAll('.source-tab-panel').forEach((panel) => {
     panel.classList.toggle('hidden', panel.id !== `tabPanel-${tabKey}`);
@@ -2703,6 +2789,7 @@ function enterTheaterUI(code) {
 
   dom.welcomeView.classList.add('hidden');
   dom.theaterView.classList.add('hidden');
+  if (dom.appHeader) dom.appHeader.classList.remove('hidden');
 
   // v2: land in the Pre-Show Lounge first — face to face — then tap
   // "Start watching" to enter the theater (video becomes the PiP).
@@ -2800,8 +2887,8 @@ function showReadyPrompt() {
       return `
         <span class="px-3 py-1.5 rounded-full text-xs font-medium border ${
           isReady
-            ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-200'
-            : 'bg-white/5 border-white/15 text-gray-400'
+            ? 'bg-presence-indicator/10 border-presence-indicator/25 text-presence-indicator'
+            : 'bg-surface-control border-hairline-border text-text-muted'
         }">
           ${escapeHtml(p.name)}: ${isReady ? 'Ready ✓' : 'Waiting...'}
         </span>
@@ -2810,7 +2897,7 @@ function showReadyPrompt() {
     .join('');
 
   const amIReady = Boolean(readyMap[state.userId]);
-  dom.confirmReadyBtn.textContent = amIReady ? 'Waiting for Partner...' : "I'm Ready 🍿";
+  dom.confirmReadyBtn.textContent = amIReady ? 'Waiting for Partner...' : "I'm Ready";
   dom.confirmReadyBtn.disabled = amIReady;
 }
 
@@ -2894,7 +2981,7 @@ function runLocalCountdownSequence(startTimestamp = Date.now()) {
     } else if (step === 1) {
       renderStep('1', 'Starting together...');
     } else if (step === 0) {
-      renderStep('🍿', 'Enjoy the show!');
+      renderStep('GO', 'Enjoy the show!');
       engageRemoteSyncLock();
       executeLocalPlay();
     } else {
@@ -2966,7 +3053,7 @@ function sendReaction(emoji, isLovePulse = false) {
 function renderWhisperMessages(messages) {
   if (!messages.length) {
     dom.whisperMessagesList.innerHTML = `
-      <div class="text-center text-xs text-gray-500 my-auto py-6">
+      <div class="text-center text-xs text-text-muted my-auto py-6">
         No whispers yet — send a sweet note or timestamped reaction!
       </div>
     `;
@@ -2984,17 +3071,17 @@ function renderWhisperMessages(messages) {
       return `
         <div class="flex flex-col ${isMe ? 'items-end' : 'items-start'}">
           <div class="flex items-center gap-1.5 mb-0.5 px-1">
-            <span class="text-[10px] font-medium ${isMe ? 'text-amber-300' : 'text-rose-300'}">${escapeHtml(m.senderName)}</span>
+            <span class="text-[10px] font-medium ${isMe ? 'text-primary-container' : 'text-text-secondary'}">${escapeHtml(m.senderName)}</span>
             ${
               m.movieTimestamp
-                ? `<span class="font-mono text-[9px] px-1.5 py-0.2 rounded bg-white/10 text-gray-300">@ ${escapeHtml(m.movieTimestamp)}</span>`
+                ? `<span class="font-mono text-[9px] px-1.5 py-0.2 rounded bg-surface-control text-text-secondary">@ ${escapeHtml(m.movieTimestamp)}</span>`
                 : ''
             }
           </div>
           <div class="max-w-[88%] px-3 py-2 rounded-2xl text-xs leading-relaxed ${
             isMe
-              ? 'bg-amber-500/20 border border-amber-500/30 text-amber-50 rounded-tr-sm'
-              : 'bg-white/10 border border-white/10 text-gray-100 rounded-tl-sm'
+              ? 'bg-primary-container/15 border border-primary-container/25 text-text-primary rounded-tr-sm'
+              : 'bg-surface-control border border-hairline-border text-text-primary rounded-tl-sm'
           }">
             ${escapeHtml(m.text)}
           </div>
@@ -3032,10 +3119,10 @@ function renderStarSelector() {
     const half = !full && state.selectedRating >= star - 0.5;
     html += `
       <div class="relative w-8 h-8 flex items-center justify-center select-none">
-        <svg class="w-7 h-7 ${full || half ? 'text-amber-400' : 'text-gray-600'} transition" viewBox="0 0 24 24" fill="currentColor">
+        <svg class="w-7 h-7 ${full || half ? 'text-primary-container' : 'text-text-muted'} transition" viewBox="0 0 24 24" fill="currentColor">
           ${
             half
-              ? `<defs><linearGradient id="halfGrad${star}"><stop offset="50%" stop-color="#fbbf24"/><stop offset="50%" stop-color="#4b5563"/></linearGradient></defs>
+              ? `<defs><linearGradient id="halfGrad${star}"><stop offset="50%" stop-color="#E5A93C"/><stop offset="50%" stop-color="#5E5D59"/></linearGradient></defs>
                  <path fill="url(#halfGrad${star})" d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>`
               : `<path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>`
           }
@@ -3099,15 +3186,15 @@ function renderLiveRatingComparison(ratingSession) {
   dom.sideBySideRatingsGrid.innerHTML = subs
     .map(
       (s) => `
-      <div class="p-2.5 rounded-xl bg-white/5 border border-white/10 space-y-1">
+      <div class="p-2.5 rounded-[6px] bg-surface-control border border-hairline-border space-y-1">
         <div class="flex items-center justify-between">
-          <span class="text-xs font-semibold text-white truncate">${escapeHtml(s.name)}</span>
-          <span class="font-mono text-xs font-bold text-amber-400">${Number(s.score).toFixed(1)} ★</span>
+          <span class="text-xs font-semibold text-text-primary truncate">${escapeHtml(s.name)}</span>
+          <span class="font-mono text-xs font-bold text-primary-container">${Number(s.score).toFixed(1)} ★</span>
         </div>
         ${
           s.note
-            ? `<p class="text-[11px] text-gray-300 italic line-clamp-2">"${escapeHtml(s.note)}"</p>`
-            : `<p class="text-[10px] text-gray-500">No note added</p>`
+            ? `<p class="text-[11px] text-text-secondary italic line-clamp-2">"${escapeHtml(s.note)}"</p>`
+            : `<p class="text-[10px] text-text-muted">No note added</p>`
         }
       </div>
     `
@@ -3160,10 +3247,61 @@ function handleStampPassport() {
 function renderPassportTimeline(entries) {
   dom.passportCountBadge.textContent = `${entries.length} ${entries.length === 1 ? 'film' : 'films'}`;
 
+  // v2.1: the full Shared Passport view renders from the same entries —
+  // title-led text cards (no poster images exist), real count + real
+  // average in the view header, empty state when nothing is stamped.
+  if (dom.passportViewCount) {
+    dom.passportViewCount.textContent = `${entries.length} ${entries.length === 1 ? 'film' : 'films'}`;
+  }
+  if (dom.passportViewAvg) {
+    dom.passportViewAvg.textContent = entries.length
+      ? `${(entries.reduce((acc, e) => acc + Number(e.coupleAverage || 0), 0) / entries.length).toFixed(1)} avg score`
+      : '— avg score';
+  }
+  if (dom.passportEmpty) dom.passportEmpty.classList.toggle('hidden', entries.length > 0);
+  if (dom.passportGrid) {
+    dom.passportGrid.classList.toggle('hidden', entries.length === 0);
+    dom.passportGrid.innerHTML = entries
+      .map((entry) => {
+        const quote = (entry.ratings || [])
+          .map((r) => r.note)
+          .find((n) => n && n.trim());
+        const scores = (entry.ratings || [])
+          .map((r) => `${escapeHtml(r.name)}: ${Number(r.score).toFixed(1)} ★`)
+          .join(' · ');
+        const vibesHtml = (entry.vibes || [])
+          .map(
+            (v) => `<span class="px-2 py-0.5 rounded-full bg-primary-container/10 border border-primary-container/20 text-[10px] text-primary-container">${escapeHtml(v)}</span>`
+          )
+          .join('');
+        return `
+        <article class="rounded-[10px] bg-surface-card border border-hairline-border p-4 flex flex-col gap-2">
+          <div class="flex items-center justify-between gap-2">
+            <span class="font-mono text-[10px] uppercase tracking-wider text-text-muted">${escapeHtml(entry.watchedDate || '')}</span>
+            <span class="px-2 py-0.5 rounded-full bg-primary-container/15 border border-primary-container/30 text-primary-container font-mono text-[11px] font-bold">${Number(entry.coupleAverage || 0).toFixed(1)} ★ avg</span>
+          </div>
+          <h3 class="font-headline-md text-headline-md text-text-primary leading-tight">${escapeHtml(entry.movieTitle)}</h3>
+          ${scores ? `<p class="text-xs text-text-secondary">${scores}</p>` : ''}
+          ${vibesHtml ? `<div class="flex flex-wrap gap-1">${vibesHtml}</div>` : ''}
+          ${quote ? `<p class="text-xs text-text-secondary italic">"${escapeHtml(quote)}"</p>` : ''}
+          <div class="mt-auto pt-2 flex justify-end">
+            <button type="button" data-delete-passport="${entry.id}" title="Remove entry" class="delete-passport-btn text-[11px] text-text-muted hover:text-error transition cursor-pointer">Remove</button>
+          </div>
+        </article>
+      `;
+      })
+      .join('');
+    dom.passportGrid.querySelectorAll('.delete-passport-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        handleDeletePassportEntry(btn.dataset.deletePassport);
+      });
+    });
+  }
+
   if (!entries.length) {
     dom.passportTimelineList.innerHTML = `
-      <div class="rounded-xl border border-dashed border-white/10 p-4 text-center text-xs text-gray-500">
-        Your passport is ready for its first stamp! Tap <strong class="text-amber-400">★ Rate Movie Together</strong> after watching.
+      <div class="rounded-[6px] border border-dashed border-hairline-border p-4 text-center text-xs text-text-muted">
+        Your passport is ready for its first stamp! Tap <strong class="text-primary-container">★ Rate Movie Together</strong> after watching.
       </div>
     `;
     return;
@@ -3174,12 +3312,12 @@ function renderPassportTimeline(entries) {
       const ratingsHtml = (entry.ratings || [])
         .map(
           (r) => `
-          <div class="text-[11px] bg-black/40 rounded-lg p-2 border border-white/5">
+          <div class="text-[11px] bg-canvas-background rounded-[6px] p-2 border border-hairline-border">
             <div class="flex items-center justify-between">
-              <span class="font-semibold text-rose-200">${escapeHtml(r.name)}</span>
-              <span class="font-mono text-amber-400 font-semibold">${Number(r.score).toFixed(1)} ★</span>
+              <span class="font-semibold text-text-primary">${escapeHtml(r.name)}</span>
+              <span class="font-mono text-primary-container font-semibold">${Number(r.score).toFixed(1)} ★</span>
             </div>
-            ${r.note ? `<p class="text-gray-300 italic mt-1">"${escapeHtml(r.note)}"</p>` : ''}
+            ${r.note ? `<p class="text-text-secondary italic mt-1">"${escapeHtml(r.note)}"</p>` : ''}
           </div>
         `
         )
@@ -3187,22 +3325,22 @@ function renderPassportTimeline(entries) {
 
       const vibesHtml = (entry.vibes || [])
         .map(
-          (v) => `<span class="px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/25 text-[10px] text-amber-300">${escapeHtml(v)}</span>`
+          (v) => `<span class="px-2 py-0.5 rounded-full bg-primary-container/10 border border-primary-container/20 text-[10px] text-primary-container">${escapeHtml(v)}</span>`
         )
         .join('');
 
       return `
-        <article class="passport-stamp rounded-2xl p-3.5 space-y-2.5">
+        <article class="rounded-[10px] bg-surface-control border border-hairline-border p-3.5 space-y-2.5">
           <div class="flex items-start justify-between gap-2">
             <div>
-              <span class="text-[10px] font-mono uppercase tracking-wider text-gray-400">${escapeHtml(entry.watchedDate || '')}</span>
-              <h4 class="font-serif text-base font-bold text-white leading-snug">${escapeHtml(entry.movieTitle)}</h4>
+              <span class="text-[10px] font-mono uppercase tracking-wider text-text-muted">${escapeHtml(entry.watchedDate || '')}</span>
+              <h4 class="font-headline-md text-headline-md text-text-primary leading-snug">${escapeHtml(entry.movieTitle)}</h4>
             </div>
             <div class="flex items-center gap-1.5 shrink-0">
-              <span class="px-2.5 py-1 rounded-full bg-gradient-to-r from-amber-500/25 to-rose-500/25 border border-amber-400/40 font-mono text-xs font-bold text-amber-300">
+              <span class="px-2.5 py-1 rounded-full bg-primary-container/15 border border-primary-container/30 font-mono text-xs font-bold text-primary-container">
                 ${Number(entry.coupleAverage || 0).toFixed(1)} ★
               </span>
-              <button type="button" data-delete-passport="${entry.id}" title="Remove entry" class="delete-passport-btn p-1 text-gray-500 hover:text-rose-400 transition cursor-pointer">
+              <button type="button" data-delete-passport="${entry.id}" title="Remove entry" class="delete-passport-btn p-1 text-text-muted hover:text-error transition cursor-pointer">
                 ✕
               </button>
             </div>
@@ -3344,6 +3482,8 @@ dom.leaveRoomBtn.addEventListener('click', () => {
   executeLocalPause();
   if (dom.loungeView) dom.loungeView.classList.add('hidden');
   dom.theaterView.classList.add('hidden');
+  if (dom.passportView) dom.passportView.classList.add('hidden');
+  if (dom.appHeader) dom.appHeader.classList.add('hidden');
   dom.welcomeView.classList.remove('hidden');
 });
 
@@ -3567,16 +3707,33 @@ dom.thinkingOfYouBtn.addEventListener('click', () => {
 });
 
 // Whisper Chat
+// v2.1: the whisper drawer is now the Whisper Notes tab of the rail.
+// setWhisperOpen opens that tab; the Passport tab is the other rail tab.
 function setWhisperOpen(open) {
   state.isWhisperOpen = open;
-  dom.whisperDrawerBody.classList.toggle('hidden', !state.isWhisperOpen);
+  if (open) switchRailTab('whisper');
+  else dom.whisperDrawerBody.classList.add('hidden');
   dom.whisperChevron.style.transform = state.isWhisperOpen ? 'rotate(0deg)' : 'rotate(-90deg)';
   if (state.isWhisperOpen) {
     dom.whisperUnreadBadge.classList.add('hidden');
   }
 }
-dom.toggleWhisperBtn.addEventListener('click', () => {
-  setWhisperOpen(!state.isWhisperOpen);
+
+function switchRailTab(tab) {
+  const whisper = tab === 'whisper';
+  state.isWhisperOpen = whisper;
+  dom.whisperDrawerBody.classList.toggle('hidden', !whisper);
+  if (dom.railPassportPane) dom.railPassportPane.classList.toggle('hidden', whisper);
+  document.querySelectorAll('.rail-tab-btn').forEach((b) => {
+    b.classList.toggle('rail-tab-active', b.dataset.railTab === tab);
+  });
+  dom.whisperChevron.style.transform = whisper ? 'rotate(0deg)' : 'rotate(-90deg)';
+  if (whisper) dom.whisperUnreadBadge.classList.add('hidden');
+  if (dom.theaterRail) dom.theaterRail.classList.remove('rail-collapsed');
+}
+
+document.querySelectorAll('.rail-tab-btn').forEach((b) => {
+  b.addEventListener('click', () => switchRailTab(b.dataset.railTab));
 });
 
 dom.whisperForm.addEventListener('submit', (e) => {
@@ -3590,11 +3747,18 @@ document.querySelectorAll('.quick-whisper-btn').forEach((btn) => {
 });
 
 // Rating Panel & Vibes
-dom.toggleRatePanelBtn.addEventListener('click', () => {
-  dom.rateMoviePanel.classList.toggle('hidden');
+function openRatePanel() {
+  dom.rateMoviePanel.classList.remove('hidden');
   if (!dom.ratingMovieTitleInput.value && state.mediaTitle) {
     dom.ratingMovieTitleInput.value = state.mediaTitle;
   }
+}
+dom.toggleRatePanelBtn.addEventListener('click', () => {
+  if (dom.rateMoviePanel.classList.contains('hidden')) openRatePanel();
+  else dom.rateMoviePanel.classList.add('hidden');
+});
+document.querySelectorAll('.rate-movie-trigger').forEach((b) => {
+  b.addEventListener('click', () => openRatePanel());
 });
 
 dom.closeRatePanelBtn.addEventListener('click', () => {
@@ -3606,8 +3770,8 @@ document.querySelectorAll('.vibe-tag-btn').forEach((btn) => {
   const syncVibeStyle = () => {
     const active = state.selectedVibes.has(vibe);
     btn.className = active
-      ? 'vibe-tag-btn px-2.5 py-1 rounded-full text-[11px] border border-amber-400/60 bg-amber-500/20 text-amber-200 font-medium transition cursor-pointer'
-      : 'vibe-tag-btn px-2.5 py-1 rounded-full text-[11px] border border-white/15 bg-white/5 text-gray-300 transition cursor-pointer';
+      ? 'vibe-tag-btn px-2.5 py-1 rounded-full text-[11px] border border-primary-container/60 bg-primary-container/15 text-primary-container font-medium transition cursor-pointer'
+      : 'vibe-tag-btn px-2.5 py-1 rounded-full text-[11px] border border-hairline-border bg-surface-control text-text-secondary transition cursor-pointer';
   };
   syncVibeStyle();
   btn.addEventListener('click', () => {
@@ -3623,6 +3787,41 @@ document.querySelectorAll('.vibe-tag-btn').forEach((btn) => {
 dom.submitMyRatingBtn.addEventListener('click', handleSubmitMyRating);
 dom.stampPassportBtn.addEventListener('click', handleStampPassport);
 
+// v2.1 wiring: top-nav view switches (header + mobile nav row + the
+// "View full passport" buttons), the room-chip copy button, the lounge
+// end-call button, and the mobile bottom-sheet rail toggle.
+document.querySelectorAll('.app-nav-link').forEach((a) => {
+  a.addEventListener('click', (e) => {
+    e.preventDefault();
+    showAppView(a.dataset.navView);
+  });
+});
+if (dom.copyRoomCodeBtn) {
+  dom.copyRoomCodeBtn.addEventListener('click', () => {
+    if (state.roomCode) {
+      copyTextSafely(state.roomCode);
+      showToast('Room code copied', 'gold');
+    }
+  });
+}
+if (dom.loungeEndBtn) {
+  dom.loungeEndBtn.addEventListener('click', () => {
+    endMediaCall();
+  });
+}
+if (dom.railHeader) {
+  dom.railHeader.addEventListener('click', (e) => {
+    // Tapping a tab switches the tab and expands the sheet; tapping the
+    // header anywhere else collapses/expands it (mobile bottom sheet only —
+    // on desktop the rail-collapsed class does nothing).
+    if (e.target.closest('.rail-tab-btn')) {
+      if (dom.theaterRail) dom.theaterRail.classList.remove('rail-collapsed');
+      return;
+    }
+    if (dom.theaterRail) dom.theaterRail.classList.toggle('rail-collapsed');
+  });
+}
+
 // Save one last position when the page is closed or hidden.
 window.addEventListener('pagehide', saveFinalPosition);
 
@@ -3637,7 +3836,7 @@ window.addEventListener('DOMContentLoaded', () => {
     dom.detectedRoomCodeText.textContent = invitedCode;
     dom.inviteDetectedBanner.classList.remove('hidden');
   }
-  dom.authInitStatus.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-400"></span><span class="text-emerald-300/90">Peer-to-peer ready · Memories saved on this device + .jsonl file — no cloud yet</span>`;
+  dom.authInitStatus.innerHTML = `<span class="w-2 h-2 rounded-full bg-presence-indicator"></span><span class="text-presence-indicator/90">Peer-to-peer ready · Memories saved on this device + .jsonl file — no cloud yet</span>`;
   loadYouTubeApiScript();
 });
   </script>
