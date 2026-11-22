@@ -971,7 +971,7 @@
 // =========================================================================
 
 const PEERJS_HOST_PREFIX = 'c2t-';
-const APP_VERSION = '2.4.8'; // v2.4.3: undecodable-video detection — HEVC/DivX video with playable audio fires no error and plays sound over a black screen; the app now says so at loadedmetadata and offers the converter; a fatal HLS error gets a banner; a local .m3u8 playlist gets a plain message instead of a dead player (its segments can't resolve from a blob URL) (?v=46)
+const APP_VERSION = '2.4.9'; // v2.4.3: undecodable-video detection — HEVC/DivX video with playable audio fires no error and plays sound over a black screen; the app now says so at loadedmetadata and offers the converter; a fatal HLS error gets a banner; a local .m3u8 playlist gets a plain message instead of a dead player (its segments can't resolve from a blob URL) (?v=46)
 // ICE servers: Google + Cloudflare STUN for direct links, PeerJS's own
 // TURN (its built-in default, which a custom config otherwise discards)
 // as the relay fallback. Open Relay was dropped 22 Nov 2026: its TLS
@@ -5260,8 +5260,17 @@ if (dom.railHeader) {
   });
 }
 
-// Save one last position when the page is closed or hidden.
-window.addEventListener('pagehide', saveFinalPosition);
+// Save one last position when the page is closed or hidden — and free
+// the room's host id at once. Without the destroy, a closed tab's id
+// lingers on the signalling server, so a fresh tab in the same room gets
+// "unavailable-id" and joins as a guest of the dead tab instead of
+// connecting to the partner — the two fresh tabs never talk to each
+// other. Skip when the page is entering the back/forward cache
+// (persisted): coming back must keep the peer alive.
+window.addEventListener('pagehide', (e) => {
+  saveFinalPosition();
+  if (!e.persisted) { try { if (state.peer) state.peer.destroy(); } catch (_) {} }
+});
 
 // =========================================================================
 // 17. BOOTSTRAP ON LOAD
