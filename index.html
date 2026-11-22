@@ -681,7 +681,7 @@
       </div>
 
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-        <div class="relative rounded-[10px] overflow-hidden bg-black border border-hairline-border aspect-video">
+        <div id="loungeLocalTile" class="relative rounded-[10px] overflow-hidden bg-black border border-hairline-border aspect-video">
           <video id="loungeLocalVideo" autoplay muted playsinline class="w-full h-full object-cover"></video>
           <span id="loungeLocalName" class="absolute bottom-2 left-2 px-2 py-1 rounded bg-canvas-background/70 text-xs text-text-primary flex items-center gap-1.5">
             <span class="w-1.5 h-1.5 rounded-full bg-presence-indicator"></span>You
@@ -690,7 +690,7 @@
             <span class="material-symbols-outlined text-[12px]">&#xE02B;</span>Muted
           </span>
         </div>
-        <div class="relative rounded-[10px] overflow-hidden bg-black border border-hairline-border aspect-video">
+        <div id="loungePartnerTile" class="relative rounded-[10px] overflow-hidden bg-black border border-hairline-border aspect-video">
           <video id="loungePartnerVideo" autoplay playsinline class="w-full h-full object-cover"></video>
           <span id="loungePartnerName" class="absolute bottom-2 left-2 px-2 py-1 rounded bg-canvas-background/70 text-xs text-text-primary flex items-center gap-1.5">
             <span class="w-1.5 h-1.5 rounded-full bg-text-muted"></span>Partner
@@ -845,7 +845,7 @@
       <span id="pipPartnerName" class="text-xs font-semibold text-text-secondary truncate">Partner</span>
       <span class="text-[10px] font-code-timecode uppercase tracking-wider text-text-muted">Drag</span>
     </div>
-    <div class="relative aspect-video bg-black">
+    <div id="pipVideoBox" class="relative aspect-video bg-black">
       <video id="pipPartnerVideo" autoplay playsinline class="w-full h-full object-cover"></video>
       <video id="pipLocalVideo" autoplay muted playsinline class="absolute bottom-1.5 right-1.5 w-16 sm:w-20 aspect-video object-cover rounded border border-hairline-border bg-black"></video>
     </div>
@@ -945,7 +945,7 @@
 // =========================================================================
 
 const PEERJS_HOST_PREFIX = 'c2t-';
-const APP_VERSION = '2.3.4'; // v2.3.4: the ?v=36 seq-0 guard was too broad — it also dropped real play/pause lines from an older cached version (no seq), so the partner could play without Megah following; now only the room-default "opened room" snapshot state is dropped (?v=37)
+const APP_VERSION = '2.3.5'; // v2.3.5: camera boxes follow the stream's real aspect — a portrait phone camera in a 16:9 box cropped to a forehead; a portrait PiP also narrows so it does not cover the movie (?v=38)
 // ICE servers: Google + Cloudflare STUN for direct links, PeerJS's own
 // TURN (its built-in default, which a custom config otherwise discards)
 // as the relay fallback. Open Relay was dropped 22 Nov 2026: its TLS
@@ -1058,7 +1058,9 @@ const dom = {
   appHeader: document.getElementById('appHeader'),
   loungeView: document.getElementById('loungeView'),
   loungeLocalVideo: document.getElementById('loungeLocalVideo'),
+  loungeLocalTile: document.getElementById('loungeLocalTile'),
   loungePartnerVideo: document.getElementById('loungePartnerVideo'),
+  loungePartnerTile: document.getElementById('loungePartnerTile'),
   loungeLocalName: document.getElementById('loungeLocalName'),
   loungePartnerName: document.getElementById('loungePartnerName'),
   loungeStatus: document.getElementById('loungeStatus'),
@@ -1072,6 +1074,7 @@ const dom = {
   loungeMicIcon: document.getElementById('loungeMicIcon'),
   loungeCamIcon: document.getElementById('loungeCamIcon'),
   callPip: document.getElementById('callPip'),
+  pipVideoBox: document.getElementById('pipVideoBox'),
   pipPartnerVideo: document.getElementById('pipPartnerVideo'),
   pipLocalVideo: document.getElementById('pipLocalVideo'),
   pipPartnerName: document.getElementById('pipPartnerName'),
@@ -1957,6 +1960,35 @@ function updateCallButtons() {
   if (dom.loungeMicBadge) dom.loungeMicBadge.classList.toggle('hidden', state.micOn);
   if (dom.pipCamBtn) dom.pipCamBtn.textContent = state.camOn ? 'Cam' : 'Cam off';
   if (dom.pipMicBtn) dom.pipMicBtn.textContent = state.micOn ? 'Mic' : 'Muted';
+}
+
+// Camera framing: a phone front camera shoots portrait (9:16), but the
+// lounge tiles and the PiP are 16:9 boxes — object-cover cropped the
+// portrait frame to a thin band, so all you saw was a forehead. Fit each
+// box to its stream's real aspect instead (the 16:9 class stays as the
+// pre-metadata default; the inline ratio wins once dimensions arrive).
+// A portrait PiP is also narrowed so it does not cover most of the movie.
+function fitVideoBoxToStream(videoEl, boxEl, shrinkPipWhenPortrait = false) {
+  if (!videoEl || !boxEl) return;
+  const apply = () => {
+    const w = videoEl.videoWidth || 0;
+    const h = videoEl.videoHeight || 0;
+    if (w > 0 && h > 0) {
+      boxEl.style.aspectRatio = w + ' / ' + h;
+      if (shrinkPipWhenPortrait && dom.callPip) {
+        dom.callPip.style.width = h > w ? '160px' : '';
+      }
+    }
+  };
+  videoEl.addEventListener('loadedmetadata', apply);
+  apply();
+}
+
+function fitCameraBoxesToStreams() {
+  fitVideoBoxToStream(dom.loungeLocalVideo, dom.loungeLocalTile);
+  fitVideoBoxToStream(dom.loungePartnerVideo, dom.loungePartnerTile);
+  fitVideoBoxToStream(dom.pipPartnerVideo, dom.pipVideoBox, true);
+  fitVideoBoxToStream(dom.pipLocalVideo, dom.pipLocalVideo);
 }
 
 function attachRemoteStream(stream) {
@@ -4698,6 +4730,9 @@ window.addEventListener('DOMContentLoaded', () => {
     navigator.mediaDevices.addEventListener('devicechange', () => { refreshVideoDevices(); });
   }
   refreshVideoDevices();
+  // Camera framing: fit each camera box to its stream's real aspect, so a
+  // portrait phone camera is never cropped to a forehead (v2.3.5).
+  fitCameraBoxesToStreams();
   dom.authInitStatus.innerHTML = `<span class="w-2 h-2 rounded-full bg-presence-indicator"></span><span class="text-presence-indicator/90">Peer-to-peer ready · Memories saved on this device + .jsonl file — no cloud yet</span>`;
   loadYouTubeApiScript();
 });
