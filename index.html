@@ -929,7 +929,7 @@
 // =========================================================================
 
 const PEERJS_HOST_PREFIX = 'c2t-';
-const APP_VERSION = '2.2.6'; // v2.2.6: startLocalCamera re-enables the track when the stream is still alive — the lounge Cam button could never turn the camera back on after a toggle-off (?v=31)
+const APP_VERSION = '2.2.7'; // v2.2.7: camera-on re-places a call that was placed/answered without a video track — the partner never saw the local video (?v=32)
 // ICE servers: Google + Cloudflare STUN for direct links, PeerJS's own
 // TURN (its built-in default, which a custom config otherwise discards)
 // as the relay fallback. Open Relay was dropped 22 Nov 2026: its TLS
@@ -1987,6 +1987,36 @@ function endMediaCall() {
   showPip(false);
 }
 
+// Pure: does this live call already carry our camera to the partner?
+// senders are the connection's RTCRtpSenders; liveTrack is our current
+// video track (or null). A disabled or ended track counts as not carried.
+function callCarriesLiveVideo(senders, liveTrack) {
+  if (!liveTrack || !senders || !senders.length) return false;
+  return senders.some((s) => s && s.track === liveTrack && liveTrack.readyState === 'live' && liveTrack.enabled);
+}
+
+// The camera just came on: make sure the partner actually gets it. A call
+// placed (or answered) before the camera existed carries no video track,
+// and a live PeerJS call does not pick up a track added later — so end
+// that call and place a fresh one with the new stream. If no call exists
+// yet, place one. No-op when the live call already carries this camera.
+function attachCameraToCall() {
+  if (!state.peerConnected || !state.localStream) return;
+  const peerId = (state.isHost && state.conn) ? state.conn.peer : peerHostId(state.roomCode);
+  if (!peerId) return;
+  if (state.mediaConn) {
+    let senders = [];
+    try {
+      const pc = state.mediaConn.peerConnection;
+      senders = (pc && pc.getSenders) ? pc.getSenders() : [];
+    } catch (_) { senders = []; }
+    const liveTrack = state.localStream.getVideoTracks()[0] || null;
+    if (callCarriesLiveVideo(senders, liveTrack)) return;
+    endMediaCall();
+  }
+  startMediaCallTo(peerId);
+}
+
 async function startLocalCamera() {
   // The stream is still alive after a plain toggle-off (setCamOn only
   // disables the video track) — so "turn the camera back on" must
@@ -1996,6 +2026,7 @@ async function startLocalCamera() {
   // black frame.
   if (state.localStream) {
     setCamOn(true);
+    attachCameraToCall();
     return true;
   }
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -2036,6 +2067,7 @@ async function startLocalCamera() {
     if (dom.pipLocalVideo) dom.pipLocalVideo.srcObject = stream;
     updateCallButtons();
     refreshVideoDevices();
+    attachCameraToCall();
     return true;
   } catch (e) {
     console.error('Camera error:', e);
