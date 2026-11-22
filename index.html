@@ -929,7 +929,7 @@
 // =========================================================================
 
 const PEERJS_HOST_PREFIX = 'c2t-';
-const APP_VERSION = '2.2.5'; // v2.2.5: restored + partner YouTube media go through Piped too — the embed path was leaking ads back after every refresh (?v=30)
+const APP_VERSION = '2.2.6'; // v2.2.6: startLocalCamera re-enables the track when the stream is still alive — the lounge Cam button could never turn the camera back on after a toggle-off (?v=31)
 // ICE servers: Google + Cloudflare STUN for direct links, PeerJS's own
 // TURN (its built-in default, which a custom config otherwise discards)
 // as the relay fallback. Open Relay was dropped 22 Nov 2026: its TLS
@@ -1988,7 +1988,16 @@ function endMediaCall() {
 }
 
 async function startLocalCamera() {
-  if (state.localStream) return true;
+  // The stream is still alive after a plain toggle-off (setCamOn only
+  // disables the video track) — so "turn the camera back on" must
+  // re-enable that track. The old early return left camOn false and the
+  // track disabled, so the lounge Cam button could never switch the
+  // camera back on: it looked dead, and the partner stayed on a dim
+  // black frame.
+  if (state.localStream) {
+    setCamOn(true);
+    return true;
+  }
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
     showToast('This browser cannot open the camera — you can still watch without video.', 'rose');
     return false;
