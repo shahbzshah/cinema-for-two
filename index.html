@@ -929,7 +929,7 @@
 // =========================================================================
 
 const PEERJS_HOST_PREFIX = 'c2t-';
-const APP_VERSION = '2.3.0'; // v2.3.0: live local-file sharing — the playing file streams to the partner over a second PeerJS call and shows on their big screen, like YouTube (?v=33)
+const APP_VERSION = '2.3.1'; // v2.3.1: a fresh pick no longer resumes the room's stale saved playback — the file played a few seconds then paused itself back to 0 when metadata loaded, freezing the partner's stream too (?v=34)
 // ICE servers: Google + Cloudflare STUN for direct links, PeerJS's own
 // TURN (its built-in default, which a custom config otherwise discards)
 // as the relay fallback. Open Relay was dropped 22 Nov 2026: its TLS
@@ -958,6 +958,7 @@ const state = {
   mediaUrl: '',
   mediaTitle: '',
   isRemoteSync: false,
+  skipMetadataResume: false, // a fresh pick sets this: the room's saved playback belongs to the previous media, not the new one
   remoteSyncTimer: null,
   lastProcessedSeq: 0,
   lastSeqBySender: {}, // highest playback seq seen per sender — seq counters are per-device, never compare across devices
@@ -2995,9 +2996,7 @@ function mountYouTubePlayer(videoId) {
             dom.ratingMovieTitleInput.value = data.title;
           }
         }
-        if (state.roomData && state.roomData.playback) {
-          applyRemotePlaybackState(state.roomData.playback, true);
-        }
+        maybeResumeSavedPlayback();
       },
       onError: (event) => {
         const code = event && event.data;
@@ -3073,6 +3072,7 @@ function mountHtml5Video(srcUrl, titleLabel, onErrorOverride) {
 // If the instance is down or the stream will not play, use the YouTube
 // embed exactly as before — never a dead screen.
 async function loadYouTubeVideo(ytId, titleLabel) {
+  state.skipMetadataResume = true;
   stopMovieShare();
   const adFree = await mountYouTubeAdFree(ytId, titleLabel);
   if (adFree) {
@@ -3202,9 +3202,7 @@ dom.html5VideoPlayer.addEventListener('pause', () => {
 
 dom.html5VideoPlayer.addEventListener('loadedmetadata', () => {
   updateTimelineUI();
-  if (state.roomData && state.roomData.playback) {
-    applyRemotePlaybackState(state.roomData.playback, true);
-  }
+  maybeResumeSavedPlayback();
   // The file's duration is known now — refresh the partner's timeline.
   if (state.movieSharing) {
     sendPeerMessage({ kind: 'movie-share-start', from: state.userId, fromName: state.userName, at: Date.now(), fileName: state.localFileName || '', title: state.mediaTitle || '', duration: getPlayerDuration() });
@@ -3253,6 +3251,31 @@ function broadcastPlaybackChange(isPlaying, currentTime, actionLabel = null) {
   });
   replayLog();
   sendPeerMessage({ kind: 'log-line', from: state.userId, fromName: state.userName, at: Date.now(), line });
+}
+
+// Pure: is this saved playback state fresh enough to resume from, or does
+// it belong to an older media? A playback line older than the current media
+// is stale — resuming from it would pause/seek the new video.
+function playbackIsFreshForMedia(playback, media) {
+  if (!playback || !media) return false;
+  return (Number(playback.updatedAt) || 0) > (Number(media.updatedAt) || 0);
+}
+
+// Resume the room's saved playback position — but only when it actually
+// belongs to the media on screen. Two guards: a fresh pick sets
+// skipMetadataResume (the saved state belongs to the previous media), and
+// a playback line older than the current media is stale by construction.
+// Without both, a newly picked file plays a few seconds and then pauses
+// itself back to 0 when its metadata loads — and the shared stream freezes
+// on the partner's side at the same moment.
+function maybeResumeSavedPlayback() {
+  if (!state.roomData || !state.roomData.playback) return;
+  if (state.skipMetadataResume) {
+    state.skipMetadataResume = false;
+    return;
+  }
+  if (!playbackIsFreshForMedia(state.roomData.playback, state.roomData.media)) return;
+  applyRemotePlaybackState(state.roomData.playback, true);
 }
 
 function applyRemotePlaybackState(playback, forceImmediate = false) {
@@ -3484,9 +3507,7 @@ function enterTheaterUI(code) {
   replayLog();
   renderStarSelector();
   renderAllFromLog();
-  if (state.roomData.playback) {
-    applyRemotePlaybackState(state.roomData.playback, true);
-  }
+  maybeResumeSavedPlayback();
   updatePartnerPresenceUI();
 
   setupPeer();
@@ -4252,6 +4273,7 @@ dom.urlLoadForm.addEventListener('submit', async (e) => {
     const cleanTitle = rawUrl.split('/').pop()?.split('?')[0] || 'Shared Video Stream';
     state.mediaType = 'url';
     state.mediaUrl = rawUrl;
+    state.skipMetadataResume = true;
     stopMovieShare();
     mountHtml5Video(rawUrl, cleanTitle);
     syncMediaToRoom('url', rawUrl, cleanTitle);
@@ -4283,6 +4305,7 @@ dom.localFileInput.addEventListener('change', async (e) => {
   state.mediaUrl = objectUrl;
   state.localFileUrl = objectUrl;
   state.localFileName = file.name;
+  state.skipMetadataResume = true;
   dom.localFileSelectedBadge.classList.remove('hidden');
   dom.localFileNameDisplay.textContent = file.name;
 
@@ -4304,6 +4327,7 @@ document.querySelectorAll('.sample-clip-btn').forEach((btn) => {
     } else {
       state.mediaType = 'url';
       state.mediaUrl = sampleUrl;
+      state.skipMetadataResume = true;
       stopMovieShare();
       mountHtml5Video(sampleUrl, sampleTitle);
       syncMediaToRoom('url', sampleUrl, sampleTitle);
