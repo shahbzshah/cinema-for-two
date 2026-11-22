@@ -847,7 +847,7 @@
     </div>
     <div id="pipVideoBox" class="relative aspect-video bg-black">
       <video id="pipPartnerVideo" autoplay playsinline class="w-full h-full object-cover"></video>
-      <video id="pipLocalVideo" autoplay muted playsinline class="absolute bottom-1.5 right-1.5 w-16 sm:w-20 aspect-video object-cover rounded border border-hairline-border bg-black"></video>
+      <video id="pipLocalVideo" autoplay muted playsinline class="absolute bottom-1.5 right-1.5 w-10 sm:w-12 aspect-video object-cover rounded border border-hairline-border bg-black"></video>
     </div>
     <div class="flex items-center justify-center gap-1 px-2 py-1.5 border-t border-hairline-border">
       <button id="pipMicBtn" type="button" class="px-2 py-1 rounded-[6px] bg-surface-control hover:bg-surface-variant text-text-primary text-[11px] font-semibold cursor-pointer">Mic</button>
@@ -945,7 +945,7 @@
 // =========================================================================
 
 const PEERJS_HOST_PREFIX = 'c2t-';
-const APP_VERSION = '2.3.6'; // v2.3.6: same camera framing as 2.3.5, plus the ?debug=1 panel prints its own version (so a screenshot proves which build a phone is running) and the fit re-runs on video resize (rotation/camera switch) (?v=39)
+const APP_VERSION = '2.3.7'; // v2.3.7: PiP self-view shrunk w-16/w-20 -> w-10/w-12 — the ?v=38 portrait fit made it 64x114 and it covered the partner; now ~40x71, a small corner preview (?v=40)
 // ICE servers: Google + Cloudflare STUN for direct links, PeerJS's own
 // TURN (its built-in default, which a custom config otherwise discards)
 // as the relay fallback. Open Relay was dropped 22 Nov 2026: its TLS
