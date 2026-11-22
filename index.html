@@ -945,7 +945,7 @@
 // =========================================================================
 
 const PEERJS_HOST_PREFIX = 'c2t-';
-const APP_VERSION = '2.3.8'; // v2.3.8: echo fix — only the visible partner video plays audio (the hidden one kept playing too, so the partner's voice came out twice); mic noise-suppression/echo-cancellation status (ns/ec) now shows in the ?debug=1 panel (?v=41)
+const APP_VERSION = '2.3.9'; // v2.3.9: lag fix — camera call capped at 400kbps, movie share at 800kbps + 20fps capture, camera capture 15fps (was uncapped 640x360 @30fps + a second full-rate movie stream, which froze the camera on mobile data) (?v=42)
 // ICE servers: Google + Cloudflare STUN for direct links, PeerJS's own
 // TURN (its built-in default, which a custom config otherwise discards)
 // as the relay fallback. Open Relay was dropped 22 Nov 2026: its TLS
@@ -2026,6 +2026,8 @@ function wireMediaConn(call) {
   call.on('stream', (stream) => {
     debugLog('call stream received');
     attachRemoteStream(stream);
+    // Answered side: negotiation is done, our sender exists — cap it too.
+    capVideoSendBitrate(call, 400000);
   });
   call.on('close', () => {
     if (state.mediaConn !== call) return;
@@ -2141,12 +2143,28 @@ function stopReceivingMovie() {
   updateTimelineUI();
 }
 
+// Lag: a video call sends uncapped — 640x360 @30fps is often 1Mbps+ — and a
+// shared movie is a second full-rate stream on the same uplink, so on mobile
+// data the camera freezes. Cap what each call may send; the encoder then
+// drops quality instead of stalling. Never breaks the call on failure.
+async function capVideoSendBitrate(call, maxBitrate) {
+  try {
+    const pc = call && call.peerConnection;
+    const sender = pc && pc.getSenders ? pc.getSenders().find((s) => s && s.track && s.track.kind === 'video') : null;
+    if (!sender || typeof sender.setParameters !== 'function') return;
+    const params = (typeof sender.getParameters === 'function' && sender.getParameters()) || {};
+    const encoding = (params.encodings && params.encodings[0]) || {};
+    params.encodings = [{ ...encoding, maxBitrate }];
+    await sender.setParameters(params);
+  } catch (_) {}
+}
+
 function startMediaCallTo(peerId) {
   if (!state.peer || state.peer.destroyed || state.mediaConn || !peerId) return;
   debugLog('calling ' + peerId);
   try {
     const call = state.peer.call(peerId, state.localStream);
-    if (call) wireMediaConn(call);
+    if (call) { wireMediaConn(call); capVideoSendBitrate(call, 400000); }
   } catch (e) {
     console.error('Call error:', e);
   }
@@ -2235,7 +2253,7 @@ function startMovieShare() {
   }
   let movieStream = null;
   try {
-    movieStream = dom.html5VideoPlayer.captureStream();
+    movieStream = dom.html5VideoPlayer.captureStream(20);
   } catch (e) {
     showToast('This browser cannot share the video live — your partner needs the file to watch along.', 'rose');
     return;
@@ -2244,6 +2262,7 @@ function startMovieShare() {
     const call = state.peer.call(peerId, movieStream, { metadata: { kind: 'movie', fileName: state.localFileName || '', title: state.mediaTitle || '' } });
     if (!call) return;
     state.movieCall = call;
+    capVideoSendBitrate(call, 800000);
     state.movieSharing = true;
     state.movieShareFileName = state.localFileName || '';
     call.on('close', () => {
@@ -2300,7 +2319,9 @@ async function startLocalCamera() {
   }
   // Use the camera the user last switched to (v2.2.2); a saved deviceId
   // that no longer exists falls back to the facing mode.
-  const size = { width: { ideal: 640 }, height: { ideal: 360 } };
+  // 15fps for calls: half the encoding work of 30fps, still smooth enough
+  // for faces — the other half of the lag fix (the cap is the first half).
+  const size = { width: { ideal: 640 }, height: { ideal: 360 }, frameRate: { ideal: 15 } };
   const audioConstraints = { echoCancellation: true, noiseSuppression: true };
   try {
     const videoConstraints = state.currentVideoDeviceId
@@ -2450,7 +2471,9 @@ async function switchCamera() {
   }
   if (!useDeviceId) targetFacing = toggleFacingMode(state.currentFacingMode);
 
-  const size = { width: { ideal: 640 }, height: { ideal: 360 } };
+  // Same 15fps as the first capture (v2.3.9): the switched camera must not
+  // come back at 30fps and re-introduce the lag.
+  const size = { width: { ideal: 640 }, height: { ideal: 360 }, frameRate: { ideal: 15 } };
   const constraints = useDeviceId
     ? { ...size, deviceId: { exact: targetDeviceId } }
     : { ...size, facingMode: targetFacing };
