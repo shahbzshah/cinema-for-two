@@ -945,7 +945,7 @@
 // =========================================================================
 
 const PEERJS_HOST_PREFIX = 'c2t-';
-const APP_VERSION = '2.3.2'; // v2.3.2: unmute overlay for blocked autoplay with sound, plain-language media error banner (bad format/codec), old blob URL revoked on file switch (?v=35)
+const APP_VERSION = '2.3.3'; // v2.3.3: a stale seq-0 snapshot (partner's log not converged yet) no longer seeks a playing video back to 0 and pauses it when the partner joins — the "plays 20 seconds then stops" bug (?v=36)
 // ICE servers: Google + Cloudflare STUN for direct links, PeerJS's own
 // TURN (its built-in default, which a custom config otherwise discards)
 // as the relay fallback. Open Relay was dropped 22 Nov 2026: its TLS
@@ -3366,6 +3366,15 @@ function applyRemotePlaybackState(playback, forceImmediate = false) {
   if (!forceImmediate && playback.updatedBy === state.userId) {
     return;
   }
+
+  // A playback state with no sequence number is the room's default
+  // ("opened room", paused at 0) — it is not a real action. It arrives
+  // via snapshots from a device whose log has not converged yet, and
+  // applying it seeks a playing video back to 0 and pauses it the
+  // moment the partner joins (or the data channel re-opens mid-play).
+  // Real play/pause/seek lines always carry seq >= 1. Forced re-syncs
+  // (room entry, Re-Sync button) bypass this.
+  if (!forceImmediate && !playback.seq) return;
 
   // Seq counters are per-device: each side numbers its own lines, so a
   // partner's seq must only be compared with that partner's previous seq.
