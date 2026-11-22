@@ -7,6 +7,9 @@
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23161310'/%3E%3Cpath d='M26 20l18 12-18 12z' fill='%23E8A33D'/%3E%3C/svg%3E" />
   <!-- PeerJS 1.5.4: browser-to-browser live sync, no backend -->
   <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+  <!-- mpegts.js + hls.js: play .ts/.m2ts/.flv and .m3u8 in the browser (MSE) -->
+  <script src="https://cdn.jsdelivr.net/npm/mpegts.js@1.7.3/dist/mpegts.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.15/dist/hls.min.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
   <script id="tailwind-config">
     // Design tokens from DESIGN.md (Stitch system). Fonts are self-hosted
@@ -444,9 +447,28 @@
               </button>
 
               <!-- Media error banner: unsupported format/codec or a dead link -->
-              <div id="mediaErrorBanner" class="hidden absolute inset-x-4 bottom-4 z-30 rounded-[6px] p-3 bg-surface-card border border-error/45 text-xs text-error flex items-center justify-between gap-3">
-                <span id="mediaErrorText">Unable to play this video.</span>
-                <button id="closeMediaErrorBtn" type="button" class="text-error font-bold px-1.5 cursor-pointer">✕</button>
+              <div id="mediaErrorBanner" class="hidden absolute inset-x-4 bottom-4 z-30 rounded-[6px] p-3 bg-surface-card border border-error/45 text-xs text-error flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <span id="mediaErrorText" class="font-medium text-text-primary">Unable to play this video.</span>
+                <div class="flex flex-wrap items-center gap-2 shrink-0">
+                  <span id="mediaErrorConvertActions" class="hidden flex flex-wrap items-center gap-2">
+                    <button id="fastConvertFileBtn" type="button" class="px-3 py-1.5 rounded-[6px] bg-primary-container hover:bg-primary text-canvas-background font-bold text-[11px] transition cursor-pointer">Fast Fix</button>
+                    <button id="fullConvertFileBtn" type="button" class="px-3 py-1.5 rounded-[6px] bg-surface-control hover:bg-surface-variant border border-hairline-border text-text-primary font-semibold text-[11px] transition cursor-pointer">Full MP4 Convert</button>
+                  </span>
+                  <button id="closeMediaErrorBtn" type="button" class="text-error font-bold px-1.5 cursor-pointer">✕</button>
+                </div>
+              </div>
+
+              <!-- Transcode overlay: in-browser conversion progress -->
+              <div id="transcodeOverlay" class="hidden absolute inset-0 z-30 bg-canvas-background/90 flex flex-col items-center justify-center p-6 text-center">
+                <div class="max-w-md w-full space-y-3">
+                  <span class="material-symbols-outlined text-[32px] text-primary-container animate-spin inline-block">&#xE863;</span>
+                  <h4 id="transcodeTitle" class="text-base font-bold text-text-primary">Preparing video for browser...</h4>
+                  <p id="transcodeSubtitle" class="text-xs text-text-secondary">Remuxing container and converting audio track to browser-compatible AAC.</p>
+                  <div class="w-full h-2 rounded-full bg-surface-control overflow-hidden">
+                    <div id="transcodeProgressBar" class="h-full bg-primary-container transition-all duration-300" style="width: 10%"></div>
+                  </div>
+                  <p id="transcodePercentText" class="text-xs text-primary-container font-code-timecode">Initializing engine...</p>
+                </div>
               </div>
 
               <div id="youtubePlayerWrapper" class="hidden w-full h-full">
@@ -749,19 +771,23 @@
             />
             <button type="submit" class="h-10 px-4 rounded-[6px] bg-primary-container hover:bg-primary text-canvas-background font-semibold text-sm transition cursor-pointer shrink-0">Load Screening</button>
           </form>
-          <p class="text-[11px] text-text-muted mt-2 leading-relaxed">YouTube links play in the synced player; direct .mp4 / .webm links play natively.</p>
+          <p class="text-[11px] text-text-muted mt-2 leading-relaxed">YouTube links play in the synced player; direct links play natively — MP4, WebM, MKV, TS, FLV and M3U8 streams included.</p>
         </div>
 
         <div id="tabPanel-local" class="source-tab-panel hidden">
           <label class="flex items-center justify-center gap-2 w-full h-10 rounded-[6px] bg-surface-control hover:bg-surface-variant border border-hairline-border text-text-primary text-sm font-medium cursor-pointer">
             <span class="material-symbols-outlined text-[16px] text-text-secondary">&#xE9FC;</span>Choose a video file
-            <input id="localFileInput" type="file" accept="video/*" class="hidden" />
+            <input id="localFileInput" type="file" accept="video/*,.mkv,.ts,.m2ts,.mts,.flv,.avi,.mov,.wmv,.m4v,.webm,.mp4,.3gp,.ogv,.vob,.m3u8" class="hidden" />
           </label>
-          <div id="localFileSelectedBadge" class="hidden mt-2 text-xs text-presence-indicator flex items-center gap-2 bg-presence-indicator/10 border border-presence-indicator/20 rounded-[6px] px-3 py-1.5">
+          <div id="localFileSelectedBadge" class="hidden mt-2 text-xs text-presence-indicator flex flex-wrap items-center gap-2 bg-presence-indicator/10 border border-presence-indicator/20 rounded-[6px] px-3 py-1.5">
             <span>Loaded locally:</span>
             <span id="localFileNameDisplay" class="font-code-timecode truncate"></span>
+            <span id="localEngineTag" class="px-2 py-0.5 rounded-[6px] bg-surface-control text-[10px] font-code-timecode text-text-secondary shrink-0">Native</span>
+            <button id="quickFixLocalFileBtn" type="button" title="Convert the audio to browser AAC" class="px-2.5 py-1 rounded-[6px] bg-primary-container/15 hover:bg-primary-container/25 border border-primary-container/30 text-primary-container text-[11px] font-semibold transition cursor-pointer">Fix Audio</button>
+            <a id="downloadConvertedMp4Btn" href="#" download="converted_movie.mp4" class="hidden px-2.5 py-1 rounded-[6px] bg-presence-indicator/15 hover:bg-presence-indicator/25 border border-presence-indicator/30 text-presence-indicator text-[11px] font-semibold transition">Save .MP4</a>
           </div>
           <p id="partnerLocalFileHint" class="text-[11px] text-text-muted mt-2 leading-relaxed">Your partner needs the same file on their device — pick it on both sides and playback stays in sync.</p>
+          <p class="text-[11px] text-text-muted mt-2 leading-relaxed">Plays MP4, WebM, MKV, TS, FLV and MOV — files with AC3/DTS audio play silent until converted with Fix Audio.</p>
         </div>
 
         <div id="tabPanel-samples" class="source-tab-panel hidden">
@@ -945,7 +971,7 @@
 // =========================================================================
 
 const PEERJS_HOST_PREFIX = 'c2t-';
-const APP_VERSION = '2.4.0'; // v2.4.0: video-error recovery — a dead stream no longer leaves a dead screen: the ad-free stream falls back to the YouTube embed when it dies mid-play, a stale saved stream re-resolves from its YouTube id, and a direct link that drops on the network retries once (?v=43)
+const APP_VERSION = '2.4.1'; // v2.4.1: universal local formats — .ts/.m2ts/.flv play via mpegts.js, .m3u8 via hls.js, MKV silent-audio (AC3/DTS) is detected and fixed in the browser with FFmpeg.wasm (Fast Fix copies video + AAC audio, Full Convert re-encodes) (?v=44)
 // ICE servers: Google + Cloudflare STUN for direct links, PeerJS's own
 // TURN (its built-in default, which a custom config otherwise discards)
 // as the relay fallback. Open Relay was dropped 22 Nov 2026: its TLS
@@ -1034,6 +1060,13 @@ const state = {
   movieShareFileName: '',
   localFileUrl: '', // object URL of the local file we picked (sender only)
   localFileName: '', // file name of the local file we picked
+  localRawFile: null, // the File object itself — kept so the in-browser converter can read it
+  convertedObjectUrl: null, // object URL of the FFmpeg-converted MP4, when one exists
+  mpegtsPlayer: null, // mpegts.js player for .ts/.m2ts/.flv (MSE) — only one engine owns the element at a time
+  hlsPlayer: null, // hls.js player for .m3u8 streams
+  ffmpegInstance: null, // loaded FFmpeg.wasm instance, reused across converts
+  isTranscoding: false,
+  audioCheckTimer: null, // silent-audio check timer, cleared on every new mount
   receivingMovie: false, // this device is watching the partner's shared file
   movieRemoteTime: null, // {currentTime, duration, isPlaying, at} — the sender's clock, for the receiver's time display
   logLines: [], // parsed JSONL log objects, in order
@@ -1099,6 +1132,9 @@ const dom = {
   localFileInput: document.getElementById('localFileInput'),
   localFileSelectedBadge: document.getElementById('localFileSelectedBadge'),
   localFileNameDisplay: document.getElementById('localFileNameDisplay'),
+  localEngineTag: document.getElementById('localEngineTag'),
+  quickFixLocalFileBtn: document.getElementById('quickFixLocalFileBtn'),
+  downloadConvertedMp4Btn: document.getElementById('downloadConvertedMp4Btn'),
   partnerLocalFileHint: document.getElementById('partnerLocalFileHint'),
   ambientGlow: document.getElementById('ambientGlow'),
   playerStage: document.getElementById('playerStage'),
@@ -1107,7 +1143,15 @@ const dom = {
   unmuteOverlayBtn: document.getElementById('unmuteOverlayBtn'),
   mediaErrorBanner: document.getElementById('mediaErrorBanner'),
   mediaErrorText: document.getElementById('mediaErrorText'),
+  mediaErrorConvertActions: document.getElementById('mediaErrorConvertActions'),
+  fastConvertFileBtn: document.getElementById('fastConvertFileBtn'),
+  fullConvertFileBtn: document.getElementById('fullConvertFileBtn'),
   closeMediaErrorBtn: document.getElementById('closeMediaErrorBtn'),
+  transcodeOverlay: document.getElementById('transcodeOverlay'),
+  transcodeTitle: document.getElementById('transcodeTitle'),
+  transcodeSubtitle: document.getElementById('transcodeSubtitle'),
+  transcodeProgressBar: document.getElementById('transcodeProgressBar'),
+  transcodePercentText: document.getElementById('transcodePercentText'),
   youtubePlayerWrapper: document.getElementById('youtubePlayerWrapper'),
   floatingReactionsLayer: document.getElementById('floatingReactionsLayer'),
   nowPlayingBanner: document.getElementById('nowPlayingBanner'),
@@ -1628,7 +1672,7 @@ function applySavedMedia() {
     } else {
       state.mediaType = 'url';
       state.mediaUrl = media.url;
-      mountHtml5Video(media.url, media.title || 'Shared Video Stream');
+      mountHtml5Video(media.url, media.title || 'Shared Video Stream', undefined, media.url);
     }
   } else if (media.type === 'local') {
     state.mediaType = 'local';
@@ -2105,6 +2149,7 @@ function answerMovieCall(call) {
 // like a YouTube video. The partner's play/pause/seek still work: they
 // send intents, the sender drives the file, the stream follows.
 function attachMovieStream(stream) {
+  destroyCustomDemuxers();
   state.mediaType = 'local';
   hideMediaError();
   hideUnmuteOverlay();
@@ -3073,6 +3118,7 @@ window.onYouTubeIframeAPIReady = function () {
 };
 
 function mountYouTubePlayer(videoId) {
+  destroyCustomDemuxers();
   if (!/^[a-zA-Z0-9_-]{11}$/.test(videoId || '')) {
     dom.nowPlayingBanner.classList.remove('hidden');
     dom.nowPlayingTitle.textContent = 'That YouTube link did not play — check the full link and try again.';
@@ -3175,9 +3221,37 @@ function videoErrorRecovery(videoId, code, alreadyRetried) {
   return 'banner';
 }
 
+// Pure: the file extension of a file name or URL, lowercased, without
+// the dot — '' when there is none. A dot before the last slash belongs
+// to a domain (blob: and googlevideo URLs have none).
+function detectVideoExtension(nameOrUrl) {
+  if (!nameOrUrl) return '';
+  const clean = String(nameOrUrl).split('?')[0].split('#')[0].toLowerCase();
+  const slashIdx = clean.lastIndexOf('/');
+  const dotIdx = clean.lastIndexOf('.');
+  if (dotIdx === -1 || dotIdx < slashIdx) return '';
+  return clean.slice(dotIdx + 1);
+}
+
+// Pure: which playback engine handles this extension?
+// 'mpegts' for .ts/.m2ts/.mts/.flv (MSE demux), 'hls' for .m3u8,
+// 'native' for everything else — MP4/WebM/MKV/MOV/AVI play natively or
+// fail with the format message (and the converter fixes those).
+function playbackEngineForExtension(ext) {
+  const e = (ext || '').toLowerCase();
+  if (e === 'ts' || e === 'm2ts' || e === 'mts' || e === 'flv') return 'mpegts';
+  if (e === 'm3u8') return 'hls';
+  return 'native';
+}
+
 function showMediaError(message) {
   dom.mediaErrorText.textContent = message;
   dom.mediaErrorBanner.classList.remove('hidden');
+  // The convert buttons only make sense for a local file on this device —
+  // hide them for network errors, dead links and shared streams.
+  if (dom.mediaErrorConvertActions) {
+    dom.mediaErrorConvertActions.classList.toggle('hidden', !state.localRawFile);
+  }
 }
 
 function hideMediaError() {
@@ -3192,7 +3266,32 @@ function hideUnmuteOverlay() {
   dom.unmuteOverlayBtn.classList.add('hidden');
 }
 
-function mountHtml5Video(srcUrl, titleLabel, onErrorOverride) {
+// Only one engine may own the video element at a time: a lingering
+// MSE player keeps feeding a hidden element and fights the next mount.
+// Called at the top of every mount and before the element gets a live
+// stream or the YouTube embed.
+function destroyCustomDemuxers() {
+  if (state.audioCheckTimer) {
+    clearTimeout(state.audioCheckTimer);
+    state.audioCheckTimer = null;
+  }
+  if (state.mpegtsPlayer) {
+    try {
+      state.mpegtsPlayer.pause();
+      state.mpegtsPlayer.unload();
+      state.mpegtsPlayer.detachMediaElement();
+      state.mpegtsPlayer.destroy();
+    } catch (_) {}
+    state.mpegtsPlayer = null;
+  }
+  if (state.hlsPlayer) {
+    try { state.hlsPlayer.destroy(); } catch (_) {}
+    state.hlsPlayer = null;
+  }
+}
+
+function mountHtml5Video(srcUrl, titleLabel, onErrorOverride, hintFileName = '') {
+  destroyCustomDemuxers();
   dom.emptyPlayerPlaceholder.classList.add('hidden');
   hideMediaError();
   hideUnmuteOverlay();
@@ -3209,9 +3308,42 @@ function mountHtml5Video(srcUrl, titleLabel, onErrorOverride) {
   dom.youtubePlayerWrapper.classList.add('hidden');
   dom.html5VideoPlayer.classList.remove('hidden');
 
-  if (dom.html5VideoPlayer.src !== srcUrl) {
-    dom.html5VideoPlayer.src = srcUrl;
-    dom.html5VideoPlayer.load();
+  // Universal local formats: .ts/.m2ts/.flv play through mpegts.js and
+  // .m3u8 through hls.js (MSE); everything else plays natively. The
+  // engine is picked from the file extension only — a Piped stream URL
+  // has none, so it always stays native.
+  const ext = detectVideoExtension(hintFileName || (typeof srcUrl === 'string' ? srcUrl : ''));
+  const engine = playbackEngineForExtension(ext);
+  if (engine === 'mpegts' && window.mpegts && window.mpegts.isSupported()) {
+    try { dom.html5VideoPlayer.removeAttribute('src'); } catch (_) {}
+    const player = window.mpegts.createPlayer(
+      { type: ext === 'flv' ? 'flv' : 'mpegts', isLive: false, url: srcUrl },
+      { enableWorker: false, lazyLoad: false, autoCleanupSourceBuffer: true }
+    );
+    state.mpegtsPlayer = player;
+    player.on(window.mpegts.Events.ERROR, () => {
+      if (state.localRawFile) {
+        showMediaError('This file uses a codec your browser cannot play (e.g. HEVC video or AC3/DTS audio). Fast Fix converts it in the browser.');
+      }
+    });
+    player.attachMediaElement(dom.html5VideoPlayer);
+    player.load();
+  } else if (engine === 'hls' && window.Hls && window.Hls.isSupported()) {
+    try { dom.html5VideoPlayer.removeAttribute('src'); } catch (_) {}
+    const hls = new window.Hls();
+    state.hlsPlayer = hls;
+    hls.loadSource(srcUrl);
+    hls.attachMedia(dom.html5VideoPlayer);
+  } else {
+    if (dom.html5VideoPlayer.src !== srcUrl) {
+      dom.html5VideoPlayer.src = srcUrl;
+      dom.html5VideoPlayer.load();
+    }
+  }
+  if (dom.localEngineTag) {
+    dom.localEngineTag.textContent = engine === 'mpegts' ? (ext === 'flv' ? 'FLV' : 'MPEG-TS')
+      : engine === 'hls' ? 'HLS'
+      : ext === 'mkv' ? 'MKV' : 'Native';
   }
   // A web page pasted as a "video link" fails here — say so plainly
   // instead of leaving a dead player. Callers that already handle the
@@ -3256,6 +3388,132 @@ function mountHtml5Video(srcUrl, titleLabel, onErrorOverride) {
   dom.nowPlayingBanner.classList.remove('hidden');
   dom.nowPlayingTitle.textContent = state.mediaTitle;
   dom.ratingMovieTitleInput.value = state.mediaTitle;
+}
+
+// In-browser converter (FFmpeg.wasm): fixes a local file the browser
+// cannot play — MKV with AC3/DTS audio, MOV/TS containers, AVI/WMV.
+// Fast Fix copies the original video stream untouched and converts only
+// the audio to AAC (seconds); Full Convert re-encodes to H.264/AAC.
+// Runs only when he taps a convert button; the engine (~30MB) downloads
+// once on first use, and the converted file stays on this device.
+async function loadBrowserFFmpeg() {
+  if (state.ffmpegInstance) return state.ffmpegInstance;
+
+  if (!window.FFmpegWASM) {
+    await new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js';
+      s.onload = resolve;
+      s.onerror = () => reject(new Error('Could not load the converter from the network. Check the connection and try again.'));
+      document.head.appendChild(s);
+    });
+  }
+
+  const { FFmpeg } = window.FFmpegWASM;
+  const ffmpeg = new FFmpeg();
+
+  ffmpeg.on('progress', ({ progress }) => {
+    const pct = Math.max(5, Math.min(99, Math.round((progress || 0) * 100)));
+    dom.transcodeProgressBar.style.width = pct + '%';
+    dom.transcodePercentText.textContent = 'Processing video: ' + pct + '%';
+  });
+
+  // Fetch the worker, core and wasm and wrap them in blob URLs so the
+  // worker loads on any origin, including the installed app.
+  const fetchToBlobUrl = async (url, mimeType) => {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('Failed to fetch ' + url);
+    const buf = await res.arrayBuffer();
+    return URL.createObjectURL(new Blob([buf], { type: mimeType }));
+  };
+
+  const baseFFmpeg = 'https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/umd';
+  const baseCore = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/umd';
+
+  const [classWorkerURL, coreURL, wasmURL] = await Promise.all([
+    fetchToBlobUrl(baseFFmpeg + '/814.ffmpeg.js', 'text/javascript'),
+    fetchToBlobUrl(baseCore + '/ffmpeg-core.js', 'text/javascript'),
+    fetchToBlobUrl(baseCore + '/ffmpeg-core.wasm', 'application/wasm')
+  ]);
+
+  await ffmpeg.load({ classWorkerURL, coreURL, wasmURL });
+
+  state.ffmpegInstance = ffmpeg;
+  return ffmpeg;
+}
+
+async function transcodeLocalFileToMp4(mode = 'fast') {
+  if (!state.localRawFile) {
+    showToast('Choose a local video file first!', 'rose');
+    return;
+  }
+  if (state.isTranscoding) return;
+
+  state.isTranscoding = true;
+  hideMediaError();
+  dom.transcodeOverlay.classList.remove('hidden');
+  dom.transcodeProgressBar.style.width = '8%';
+  dom.transcodeTitle.textContent = mode === 'fast' ? 'Fast-Fixing Container & Audio...' : 'Converting to Universal MP4...';
+  dom.transcodeSubtitle.textContent = mode === 'fast'
+    ? 'Copying the original video stream and converting AC3/DTS audio to browser AAC.'
+    : 'Converting video and audio to H.264/AAC MP4 for full browser compatibility.';
+  dom.transcodePercentText.textContent = 'Loading the in-browser media engine (first run takes a few seconds)...';
+
+  const rawFile = state.localRawFile;
+  const ext = detectVideoExtension(rawFile.name) || 'mkv';
+  const inputFileName = 'input.' + ext;
+  const outputFileName = 'output_fixed.mp4';
+
+  try {
+    const ffmpeg = await loadBrowserFFmpeg();
+    dom.transcodePercentText.textContent = 'Reading the movie into memory...';
+    const fileBytes = new Uint8Array(await rawFile.arrayBuffer());
+    await ffmpeg.writeFile(inputFileName, fileBytes);
+
+    const fastArgs = ['-i', inputFileName, '-map', '0:v:0', '-map', '0:a:0?', '-c:v', 'copy', '-c:a', 'aac', '-b:a', '192k', '-movflags', '+faststart', outputFileName];
+    const fullArgs = ['-i', inputFileName, '-map', '0:v:0', '-map', '0:a:0?', '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '23', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '192k', '-movflags', '+faststart', outputFileName];
+
+    let exitCode = await ffmpeg.exec(mode === 'fast' ? fastArgs : fullArgs);
+    if (exitCode !== 0 && mode === 'fast') {
+      // The video codec could not be copied into MP4 — escalate to a
+      // full H.264/AAC transcode instead of failing.
+      dom.transcodeTitle.textContent = 'Video Codec Needs Full Conversion...';
+      dom.transcodeSubtitle.textContent = 'Converting the video stream to H.264 + AAC MP4...';
+      exitCode = await ffmpeg.exec(fullArgs);
+    }
+    if (exitCode !== 0) throw new Error('The converter could not decode this video file.');
+
+    const outData = await ffmpeg.readFile(outputFileName);
+    try {
+      await ffmpeg.deleteFile(inputFileName);
+      await ffmpeg.deleteFile(outputFileName);
+    } catch (_) {}
+
+    if (state.convertedObjectUrl) {
+      try { URL.revokeObjectURL(state.convertedObjectUrl); } catch (_) {}
+    }
+
+    const mp4Blob = new Blob([outData.buffer], { type: 'video/mp4' });
+    const mp4Url = URL.createObjectURL(mp4Blob);
+    state.convertedObjectUrl = mp4Url;
+    state.mediaUrl = mp4Url;
+
+    const baseName = rawFile.name.replace(/\.[^/.]+$/, '');
+    dom.downloadConvertedMp4Btn.href = mp4Url;
+    dom.downloadConvertedMp4Btn.download = baseName + '_fixed.mp4';
+    dom.downloadConvertedMp4Btn.classList.remove('hidden');
+
+    mountHtml5Video(mp4Url, state.mediaTitle || baseName, undefined, baseName + '_fixed.mp4');
+    dom.localEngineTag.textContent = 'Converted MP4';
+    showToast('Video converted and ready with full audio!', 'emerald');
+  } catch (err) {
+    console.error('Transcode error:', err);
+    showMediaError('Conversion error: ' + (err.message || 'File may be too large for the browser memory (over ~1.5GB).'));
+    showToast('Could not convert the file in the browser — see the banner for details.', 'rose');
+  } finally {
+    state.isTranscoding = false;
+    dom.transcodeOverlay.classList.add('hidden');
+  }
 }
 
 // Load a YouTube video: try the ad-free Piped stream first, and only
@@ -3390,6 +3648,27 @@ dom.html5VideoPlayer.addEventListener('play', () => {
   // must never broadcast a play back to the sender.
   if (!state.isRemoteSync && !state.receivingMovie) {
     broadcastPlaybackChange(true, getPlayerCurrentTime());
+  }
+  // Silent-audio check: an MKV/MOV/TS whose audio track is AC3/DTS plays
+  // video with no sound in the browser. A second after play, if nothing
+  // was decoded, offer the in-browser fix instead of silence. Only
+  // containers that commonly carry those tracks are checked, so a
+  // genuinely silent file never triggers it.
+  if (state.mediaType === 'local' && state.localRawFile && !state.convertedObjectUrl) {
+    const ext = detectVideoExtension(state.localRawFile.name);
+    if (ext === 'mkv' || ext === 'mov' || ext === 'ts' || ext === 'm2ts' || ext === 'avi' || ext === 'wmv') {
+      if (state.audioCheckTimer) clearTimeout(state.audioCheckTimer);
+      state.audioCheckTimer = setTimeout(() => {
+        const v = dom.html5VideoPlayer;
+        if (!v.paused && v.currentTime > 0.5) {
+          const noAudioDecoded = typeof v.webkitAudioDecodedByteCount === 'number' && v.webkitAudioDecodedByteCount === 0;
+          const noAudioTracks = v.audioTracks && v.audioTracks.length === 0;
+          if (noAudioDecoded || noAudioTracks) {
+            showMediaError('Video is playing without sound — this file likely uses AC3/DTS audio. Fast Fix converts it in the browser.');
+          }
+        }
+      }, 1400);
+    }
   }
 });
 
@@ -3633,7 +3912,7 @@ function handleIncomingMediaUpdate(media, prevMedia) {
     } else {
       state.mediaType = 'url';
       state.mediaUrl = media.url;
-      mountHtml5Video(media.url, media.title || 'Shared Video Stream');
+      mountHtml5Video(media.url, media.title || 'Shared Video Stream', undefined, media.url);
     }
     if (media.updatedBy !== state.userId) {
       showToast(`${media.updatedByName} loaded "${media.title || 'a video'}" 🎬`, 'gold');
@@ -4474,7 +4753,7 @@ dom.urlLoadForm.addEventListener('submit', async (e) => {
     // (YouTube link with a bad ID, Pexels/TikTok/Instagram/Facebook page)
     // is not a video file — refuse it with guidance instead of mounting a
     // player that can never play and syncing the broken entry to the room.
-    const looksLikeVideoFile = /\.(mp4|webm|mov|m4v|ogv|ogg)(\?|#|$)/i.test(rawUrl);
+    const looksLikeVideoFile = /\.(mp4|webm|mov|m4v|ogv|ogg|mkv|avi|wmv|ts|m2ts|mts|flv|m3u8)(\?|#|$)/i.test(rawUrl);
     const looksLikeVideoPage = /(youtube\.com|youtu\.be|pexels\.com\/video|tiktok\.com|instagram\.com|facebook\.com|fb\.watch|vimeo\.com\/\d|dailymotion\.com)/i.test(rawUrl);
     if (!looksLikeVideoFile || looksLikeVideoPage) {
       showToast('That link is a web page, not a video file — paste a YouTube link or a direct .mp4 link.', 'rose');
@@ -4485,7 +4764,7 @@ dom.urlLoadForm.addEventListener('submit', async (e) => {
     state.mediaUrl = rawUrl;
     state.skipMetadataResume = true;
     stopMovieShare();
-    mountHtml5Video(rawUrl, cleanTitle);
+    mountHtml5Video(rawUrl, cleanTitle, undefined, rawUrl);
     syncMediaToRoom('url', rawUrl, cleanTitle);
     showToast('Video URL synced to room 🎬', 'emerald');
   }
@@ -4500,7 +4779,12 @@ dom.localFileInput.addEventListener('change', async (e) => {
   if (state.localFileUrl) {
     try { URL.revokeObjectURL(state.localFileUrl); } catch (_) {}
   }
+  if (state.convertedObjectUrl) {
+    try { URL.revokeObjectURL(state.convertedObjectUrl); } catch (_) {}
+    state.convertedObjectUrl = null;
+  }
   const objectUrl = URL.createObjectURL(file);
+  state.localRawFile = file;
   const cleanMovieName = file.name.replace(/\.[^/.]+$/, '').replace(/[._-]+/g, ' ');
 
   // We have the file now — stop watching anyone else's shared movie and
@@ -4522,8 +4806,9 @@ dom.localFileInput.addEventListener('change', async (e) => {
   state.skipMetadataResume = true;
   dom.localFileSelectedBadge.classList.remove('hidden');
   dom.localFileNameDisplay.textContent = file.name;
+  dom.downloadConvertedMp4Btn.classList.add('hidden');
 
-  mountHtml5Video(objectUrl, cleanMovieName);
+  mountHtml5Video(objectUrl, cleanMovieName, undefined, file.name);
   syncMediaToRoom('local', '', cleanMovieName, file.name);
   startMovieShare();
   showToast(`Loaded "${file.name}" locally!`, 'emerald');
@@ -4543,6 +4828,21 @@ dom.closeMediaErrorBtn.addEventListener('click', () => {
   hideMediaError();
 });
 
+// In-browser converter buttons: Fast Fix (copy video + AAC audio) and
+// Full Convert (re-encode to H.264/AAC). The banner only shows them for
+// a local file; the badge button is always there after a local pick.
+dom.quickFixLocalFileBtn.addEventListener('click', () => {
+  transcodeLocalFileToMp4('fast');
+});
+
+dom.fastConvertFileBtn.addEventListener('click', () => {
+  transcodeLocalFileToMp4('fast');
+});
+
+dom.fullConvertFileBtn.addEventListener('click', () => {
+  transcodeLocalFileToMp4('full');
+});
+
 // Sample Clips — route YouTube links through the YouTube player, direct
 // files through the HTML5 player (same as the URL form above).
 document.querySelectorAll('.sample-clip-btn').forEach((btn) => {
@@ -4557,7 +4857,7 @@ document.querySelectorAll('.sample-clip-btn').forEach((btn) => {
       state.mediaUrl = sampleUrl;
       state.skipMetadataResume = true;
       stopMovieShare();
-      mountHtml5Video(sampleUrl, sampleTitle);
+      mountHtml5Video(sampleUrl, sampleTitle, undefined, sampleUrl);
       syncMediaToRoom('url', sampleUrl, sampleTitle);
     }
     showToast(`Loaded "${sampleTitle}" for both of you! 🍿`, 'emerald');
