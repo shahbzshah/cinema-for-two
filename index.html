@@ -436,6 +436,23 @@
                 preload="metadata"
               ></video>
 
+              <!-- Whisper popup on the video: a partner's live message pops up
+                   over the video itself so it is seen while watching.
+                   Tap opens the chat. -->
+              <button
+                id="videoWhisperPopup"
+                type="button"
+                class="hidden absolute top-3 left-1/2 -translate-x-1/2 z-40 w-[92%] sm:w-auto sm:max-w-[420px] px-3.5 py-2 rounded-[10px] bg-surface-card/95 border border-primary-container/45 text-left cursor-pointer"
+              >
+                <span class="flex flex-col gap-0.5">
+                  <span class="flex items-center gap-1.5 text-[11px]">
+                    <span aria-hidden="true">💬</span>
+                    <span id="videoWhisperPopupName" class="font-bold text-primary-container"></span>
+                  </span>
+                  <span id="videoWhisperPopupText" class="text-xs text-text-primary leading-snug line-clamp-2"></span>
+                </span>
+              </button>
+
               <!-- Unmute overlay: shown when the browser blocks autoplay with sound -->
               <button
                 id="unmuteOverlayBtn"
@@ -971,7 +988,7 @@
 // =========================================================================
 
 const PEERJS_HOST_PREFIX = 'c2t-';
-const APP_VERSION = '2.4.9'; // v2.4.3: undecodable-video detection — HEVC/DivX video with playable audio fires no error and plays sound over a black screen; the app now says so at loadedmetadata and offers the converter; a fatal HLS error gets a banner; a local .m3u8 playlist gets a plain message instead of a dead player (its segments can't resolve from a blob URL) (?v=46)
+const APP_VERSION = '2.5.0'; // v2.4.3: undecodable-video detection — HEVC/DivX video with playable audio fires no error and plays sound over a black screen; the app now says so at loadedmetadata and offers the converter; a fatal HLS error gets a banner; a local .m3u8 playlist gets a plain message instead of a dead player (its segments can't resolve from a blob URL) (?v=46)
 // ICE servers: Google + Cloudflare STUN for direct links, PeerJS's own
 // TURN (its built-in default, which a custom config otherwise discards)
 // as the relay fallback. Open Relay was dropped 22 Nov 2026: its TLS
@@ -1041,6 +1058,7 @@ const state = {
   lastRemotePauseAt: 0, // local ms when we last applied the partner's pause — a PLAYING echo from our own player inside 5s of it is swallowed, not rebroadcast
   userPlayIntent: false, // set by the play button / countdown / movie-control before a deliberate play, so the pause-echo guard never swallows a real press
   ecWarned: false, // echo-cancellation-off warning shown once per session
+  videoWhisperTimer: null, // auto-hide timer for the on-video whisper popup
   // v2 — voice & video calling (WebRTC media over the same PeerJS link)
   localStream: null,
   remoteStream: null,
@@ -1144,6 +1162,9 @@ const dom = {
   emptyPlayerPlaceholder: document.getElementById('emptyPlayerPlaceholder'),
   html5VideoPlayer: document.getElementById('html5VideoPlayer'),
   unmuteOverlayBtn: document.getElementById('unmuteOverlayBtn'),
+  videoWhisperPopup: document.getElementById('videoWhisperPopup'),
+  videoWhisperPopupName: document.getElementById('videoWhisperPopupName'),
+  videoWhisperPopupText: document.getElementById('videoWhisperPopupText'),
   mediaErrorBanner: document.getElementById('mediaErrorBanner'),
   mediaErrorText: document.getElementById('mediaErrorText'),
   mediaErrorConvertActions: document.getElementById('mediaErrorConvertActions'),
@@ -2932,6 +2953,24 @@ function handlePeerMessage(msg) {
 
 // Apply one merged log line to the live UI (playback + media only —
 // whispers / ratings / passport are rendered by renderAllFromLog).
+// Whisper popup on the video (v2.5.0): a partner's live message pops up
+// over the video itself so it is seen while watching — no need to open
+// the chat. Tapping it opens the chat. Auto-hides after 6s; a newer
+// message replaces the text and restarts the timer.
+function showVideoWhisperPopup(name, text) {
+  if (!dom.videoWhisperPopup) return;
+  dom.videoWhisperPopupName.textContent = name;
+  dom.videoWhisperPopupText.textContent = String(text || '').slice(0, 200);
+  dom.videoWhisperPopup.classList.remove('hidden');
+  clearTimeout(state.videoWhisperTimer);
+  state.videoWhisperTimer = setTimeout(hideVideoWhisperPopup, 6000);
+}
+function hideVideoWhisperPopup() {
+  clearTimeout(state.videoWhisperTimer);
+  state.videoWhisperTimer = null;
+  if (dom.videoWhisperPopup) dom.videoWhisperPopup.classList.add('hidden');
+}
+
 function handleIncomingLogLine(line, prevMedia) {
   if (!line) return;
   if (line.type === 'media') {
@@ -2953,18 +2992,23 @@ function handleIncomingLogLine(line, prevMedia) {
       seq: Number(d.seq) || 0
     }, false);
   } else if (line.type === 'whisper') {
-    // A whisper just arrived live from the partner: pop a notification
-    // so it isn't missed while watching (the unread badge alone is easy
-    // to overlook). Tapping it opens the chat. Only when the drawer is
-    // closed — if it's open the message is already on screen. Own lines
-    // never arrive here, but guard anyway. Bulk catch-up (log-lines)
-    // doesn't pass through here, so reconnects don't spam popups.
+    // A whisper just arrived live from the partner. While watching, it
+    // pops up ON the video itself so it is seen without opening the
+    // chat; in the lounge or passport (no video on screen) it falls back
+    // to the toast. Tapping either opens the chat. Only when the drawer
+    // is closed — if it's open the message is already on screen. Own
+    // lines never arrive here, but guard anyway. Bulk catch-up
+    // (log-lines) doesn't pass through here, so reconnects don't spam.
     if (line.by && line.by !== state.userId && !state.isWhisperOpen) {
       const d = line.data || {};
       const name = d.senderName || line.byName || 'Your partner';
       const text = String(d.text || '');
-      const preview = text.length > 60 ? text.slice(0, 60) + '…' : text;
-      showToast(`💬 ${name}: ${preview}`, 'rose', () => setWhisperOpen(true), 5000);
+      if (dom.theaterView && !dom.theaterView.classList.contains('hidden')) {
+        showVideoWhisperPopup(name, text);
+      } else {
+        const preview = text.length > 60 ? text.slice(0, 60) + '…' : text;
+        showToast(`💬 ${name}: ${preview}`, 'rose', () => setWhisperOpen(true), 5000);
+      }
     }
   }
 }
@@ -4988,6 +5032,12 @@ dom.localFileInput.addEventListener('change', async (e) => {
   showToast(`Loaded "${file.name}" locally!`, 'emerald');
 });
 
+// Whisper popup on the video: tap opens the chat (and hides the popup).
+dom.videoWhisperPopup.addEventListener('click', () => {
+  hideVideoWhisperPopup();
+  setWhisperOpen(true);
+});
+
 // Unmute overlay: the browser blocked autoplay with sound, so the video
 // started muted — one tap restores sound.
 dom.unmuteOverlayBtn.addEventListener('click', () => {
@@ -5166,7 +5216,7 @@ function switchRailTab(tab) {
     b.classList.toggle('rail-tab-active', b.dataset.railTab === tab);
   });
   dom.whisperChevron.style.transform = whisper ? 'rotate(0deg)' : 'rotate(-90deg)';
-  if (whisper) dom.whisperUnreadBadge.classList.add('hidden');
+  if (whisper) { hideVideoWhisperPopup(); dom.whisperUnreadBadge.classList.add('hidden'); }
   if (dom.theaterRail) dom.theaterRail.classList.remove('rail-collapsed');
 }
 
