@@ -945,7 +945,7 @@
 // =========================================================================
 
 const PEERJS_HOST_PREFIX = 'c2t-';
-const APP_VERSION = '2.3.5'; // v2.3.5: camera boxes follow the stream's real aspect — a portrait phone camera in a 16:9 box cropped to a forehead; a portrait PiP also narrows so it does not cover the movie (?v=38)
+const APP_VERSION = '2.3.6'; // v2.3.6: same camera framing as 2.3.5, plus the ?debug=1 panel prints its own version (so a screenshot proves which build a phone is running) and the fit re-runs on video resize (rotation/camera switch) (?v=39)
 // ICE servers: Google + Cloudflare STUN for direct links, PeerJS's own
 // TURN (its built-in default, which a custom config otherwise discards)
 // as the relay fallback. Open Relay was dropped 22 Nov 2026: its TLS
@@ -1981,6 +1981,8 @@ function fitVideoBoxToStream(videoEl, boxEl, shrinkPipWhenPortrait = false) {
     }
   };
   videoEl.addEventListener('loadedmetadata', apply);
+  // Dimensions can also change later (rotation, camera switch) — re-fit then.
+  videoEl.addEventListener('resize', apply);
   apply();
 }
 
@@ -2919,7 +2921,7 @@ function updateDebugPanel() {
   const cands = state.debugCandidates && state.debugCandidates.size
     ? [...state.debugCandidates].join(', ') : 'none yet';
   const lines = [
-    `room=${state.roomCode || '-'} user=${state.userName || '-'} peerId=${state.peerId || '-'} role=${state.isHost ? 'HOST' : 'guest'}`,
+    `v=${APP_VERSION} room=${state.roomCode || '-'} user=${state.userName || '-'} peerId=${state.peerId || '-'} role=${state.isHost ? 'HOST' : 'guest'}`,
     `registered=${state.peerRegistered} connected=${state.peerConnected} syncOffline=${state.syncOffline} ice=${ice}`,
     `cands=${cands}`,
     `call=${state.mediaConn ? (state.remoteStream ? 'live' : 'calling') : 'off'} cam=${state.camOn ? 'on' : 'off'} mic=${state.micOn ? 'on' : 'off'} lounge=${state.inLounge}`,
