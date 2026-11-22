@@ -433,6 +433,22 @@
                 preload="metadata"
               ></video>
 
+              <!-- Unmute overlay: shown when the browser blocks autoplay with sound -->
+              <button
+                id="unmuteOverlayBtn"
+                type="button"
+                class="hidden absolute bottom-4 left-1/2 -translate-x-1/2 z-30 px-4 py-2 rounded-[6px] bg-primary-container text-canvas-background text-xs font-semibold flex items-center gap-2 cursor-pointer"
+              >
+                <span class="material-symbols-outlined text-[16px]">&#xE050;</span>
+                <span>Tap to Unmute</span>
+              </button>
+
+              <!-- Media error banner: unsupported format/codec or a dead link -->
+              <div id="mediaErrorBanner" class="hidden absolute inset-x-4 bottom-4 z-30 rounded-[6px] p-3 bg-surface-card border border-error/45 text-xs text-error flex items-center justify-between gap-3">
+                <span id="mediaErrorText">Unable to play this video.</span>
+                <button id="closeMediaErrorBtn" type="button" class="text-error font-bold px-1.5 cursor-pointer">✕</button>
+              </div>
+
               <div id="youtubePlayerWrapper" class="hidden w-full h-full">
                 <div id="youtubePlayerMount" class="w-full h-full"></div>
               </div>
@@ -929,7 +945,7 @@
 // =========================================================================
 
 const PEERJS_HOST_PREFIX = 'c2t-';
-const APP_VERSION = '2.3.1'; // v2.3.1: a fresh pick no longer resumes the room's stale saved playback — the file played a few seconds then paused itself back to 0 when metadata loaded, freezing the partner's stream too (?v=34)
+const APP_VERSION = '2.3.2'; // v2.3.2: unmute overlay for blocked autoplay with sound, plain-language media error banner (bad format/codec), old blob URL revoked on file switch (?v=35)
 // ICE servers: Google + Cloudflare STUN for direct links, PeerJS's own
 // TURN (its built-in default, which a custom config otherwise discards)
 // as the relay fallback. Open Relay was dropped 22 Nov 2026: its TLS
@@ -1084,6 +1100,10 @@ const dom = {
   playerStage: document.getElementById('playerStage'),
   emptyPlayerPlaceholder: document.getElementById('emptyPlayerPlaceholder'),
   html5VideoPlayer: document.getElementById('html5VideoPlayer'),
+  unmuteOverlayBtn: document.getElementById('unmuteOverlayBtn'),
+  mediaErrorBanner: document.getElementById('mediaErrorBanner'),
+  mediaErrorText: document.getElementById('mediaErrorText'),
+  closeMediaErrorBtn: document.getElementById('closeMediaErrorBtn'),
   youtubePlayerWrapper: document.getElementById('youtubePlayerWrapper'),
   floatingReactionsLayer: document.getElementById('floatingReactionsLayer'),
   nowPlayingBanner: document.getElementById('nowPlayingBanner'),
@@ -2022,6 +2042,8 @@ function answerMovieCall(call) {
 // send intents, the sender drives the file, the stream follows.
 function attachMovieStream(stream) {
   state.mediaType = 'local';
+  hideMediaError();
+  hideUnmuteOverlay();
   if (dom.youtubePlayerWrapper) dom.youtubePlayerWrapper.classList.add('hidden');
   if (dom.html5VideoPlayer) dom.html5VideoPlayer.classList.remove('hidden');
   dom.emptyPlayerPlaceholder.classList.add('hidden');
@@ -2030,13 +2052,20 @@ function attachMovieStream(stream) {
   try { dom.html5VideoPlayer.removeAttribute('src'); } catch (_) {}
   dom.html5VideoPlayer.srcObject = stream;
   dom.html5VideoPlayer.muted = false;
+  dom.html5VideoPlayer.onerror = () => {
+    showMediaError('The shared movie stream failed to play.');
+  };
   dom.nowPlayingBanner.classList.remove('hidden');
   dom.nowPlayingTitle.textContent = state.mediaTitle || 'Shared movie';
   if (state.inLounge) exitLoungeToTheater();
   dom.html5VideoPlayer.play().catch(() => {
-    // Autoplay with sound needs a tap — the Play button is the affordance.
-    updatePlayButtonUI(false);
-    showToast('Tap Play to watch the movie 🔊', 'gold');
+    // Autoplay with sound needs a tap — play muted and offer one tap to
+    // unmute, instead of a frozen screen.
+    dom.html5VideoPlayer.muted = true;
+    dom.html5VideoPlayer.play().catch(() => {});
+    showUnmuteOverlay();
+    updatePlayButtonUI(true);
+    showToast('Tap to Unmute Video 🔊', 'gold');
   });
   updateTimelineUI();
 }
@@ -2047,6 +2076,8 @@ function stopReceivingMovie() {
   engageRemoteSyncLock();
   state.receivingMovie = false;
   state.movieRemoteTime = null;
+  hideUnmuteOverlay();
+  hideMediaError();
   if (dom.html5VideoPlayer) {
     try { dom.html5VideoPlayer.pause(); } catch (_) {}
     dom.html5VideoPlayer.srcObject = null;
@@ -3033,8 +3064,40 @@ function mountYouTubePlayer(videoId) {
   });
 }
 
+// Plain-language reason a video element failed, from its MediaError code.
+// Pure: null means "no specific reason" — the caller falls back to its
+// generic message. (code 1 = aborted, 2 = network, 3 = decode, 4 = format)
+function mediaErrorMessage(code, isLocalFile) {
+  if (code === 4) return isLocalFile ? 'This video format cannot play in the browser (e.g. MKV, AVI or HEVC). Convert it to MP4 (H.264/AAC) or WebM.' : null;
+  if (code === 3) return 'Video decoding failed — the file may be corrupted or use an unsupported codec.';
+  if (code === 2) return 'Network error while loading the video.';
+  return null;
+}
+
+function showMediaError(message) {
+  dom.mediaErrorText.textContent = message;
+  dom.mediaErrorBanner.classList.remove('hidden');
+}
+
+function hideMediaError() {
+  dom.mediaErrorBanner.classList.add('hidden');
+}
+
+function showUnmuteOverlay() {
+  dom.unmuteOverlayBtn.classList.remove('hidden');
+}
+
+function hideUnmuteOverlay() {
+  dom.unmuteOverlayBtn.classList.add('hidden');
+}
+
 function mountHtml5Video(srcUrl, titleLabel, onErrorOverride) {
   dom.emptyPlayerPlaceholder.classList.add('hidden');
+  hideMediaError();
+  hideUnmuteOverlay();
+  // A fresh mount starts unmuted — if autoplay with sound is blocked
+  // again, the play() catch shows the unmute overlay for this video.
+  dom.html5VideoPlayer.muted = false;
   // A receiver switching from a shared stream to their own file must drop
   // the stream first — srcObject wins over src while it is set.
   try { dom.html5VideoPlayer.srcObject = null; } catch (_) {}
@@ -3055,8 +3118,17 @@ function mountHtml5Video(srcUrl, titleLabel, onErrorOverride) {
     dom.html5VideoPlayer.onerror = onErrorOverride;
   } else {
     dom.html5VideoPlayer.onerror = () => {
+      const code = dom.html5VideoPlayer.error && dom.html5VideoPlayer.error.code;
+      const specific = mediaErrorMessage(code, state.mediaType === 'local');
+      if (specific) {
+        showMediaError(specific);
+        showToast(specific, 'rose');
+        return;
+      }
+      const generic = 'This link did not play — it may be a web page, not a video file. Paste a YouTube link or a direct .mp4 link.';
+      showMediaError(generic);
       dom.nowPlayingBanner.classList.remove('hidden');
-      dom.nowPlayingTitle.textContent = 'This link did not play — it may be a web page, not a video file. Paste a YouTube link or a direct .mp4 link.';
+      dom.nowPlayingTitle.textContent = generic;
       showToast('This link did not play — it may be a web page, not a video file.', 'rose');
     };
   }
@@ -3125,8 +3197,17 @@ function executeLocalPlay() {
   if (state.mediaType === 'youtube' && state.ytPlayer && typeof state.ytPlayer.playVideo === 'function') {
     state.ytPlayer.playVideo();
   } else if (state.mediaType === 'url' || state.mediaType === 'local') {
-    dom.html5VideoPlayer.play().catch(() => {
-      showToast('Tap Play once to allow browser audio playback 🔊', 'gold');
+    dom.html5VideoPlayer.play().catch((err) => {
+      // The browser blocked autoplay with sound — play muted instead and
+      // offer one tap to unmute, instead of a frozen screen.
+      if (err && err.name === 'NotAllowedError') {
+        dom.html5VideoPlayer.muted = true;
+        dom.html5VideoPlayer.play().catch(() => {});
+        showUnmuteOverlay();
+        showToast('Video started muted — tap Tap to Unmute for sound 🔊', 'gold');
+      } else {
+        showToast('Tap Play once to allow browser audio playback 🔊', 'gold');
+      }
     });
   }
   updatePlayButtonUI(true);
@@ -4286,6 +4367,10 @@ dom.localFileInput.addEventListener('change', async (e) => {
   const file = e.target.files?.[0];
   if (!file) return;
 
+  // Drop the previous file's blob URL so the browser can free it.
+  if (state.localFileUrl) {
+    try { URL.revokeObjectURL(state.localFileUrl); } catch (_) {}
+  }
   const objectUrl = URL.createObjectURL(file);
   const cleanMovieName = file.name.replace(/\.[^/.]+$/, '').replace(/[._-]+/g, ' ');
 
@@ -4313,6 +4398,20 @@ dom.localFileInput.addEventListener('change', async (e) => {
   syncMediaToRoom('local', '', cleanMovieName, file.name);
   startMovieShare();
   showToast(`Loaded "${file.name}" locally!`, 'emerald');
+});
+
+// Unmute overlay: the browser blocked autoplay with sound, so the video
+// started muted — one tap restores sound.
+dom.unmuteOverlayBtn.addEventListener('click', () => {
+  dom.html5VideoPlayer.muted = false;
+  hideUnmuteOverlay();
+  showToast('Audio unmuted 🔊', 'emerald');
+});
+
+// Media error banner: dismiss the in-player notice (it stays until
+// dismissed or a new video loads).
+dom.closeMediaErrorBtn.addEventListener('click', () => {
+  hideMediaError();
 });
 
 // Sample Clips — route YouTube links through the YouTube player, direct
