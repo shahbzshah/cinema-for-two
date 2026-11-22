@@ -223,7 +223,8 @@
        fullscreen E5D0 · sync E627 · replay_10 E059 · forward_10 E056 ·
        favorite E87E · star F09A · chat_bubble E0CB · book E86E · send E163 ·
        close E5CD · keyboard_arrow_down E313 · mic E31D · mic_off E02B ·
-       videocam E04B · videocam_off E04C · call_end F0BC · link E250 ·
+       videocam E04B · videocam_off E04C · flip_camera_ios EA38 ·
+       call_end F0BC · link E250 ·
        upload_file E9FC · play_circle E1C4 · folder_open E2C8 · download F090 ·
        open_in_full F1CE · visibility_off E8F5 · check_circle F0BE ·
        hourglass_empty E88B · delete E92E · logout E9BA · content_copy E14D ·
@@ -689,6 +690,9 @@
           <button id="loungeCamBtn" type="button" title="Turn camera on / off" class="w-10 h-10 rounded-full flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-surface-control transition-colors cursor-pointer">
             <span id="loungeCamIcon" class="material-symbols-outlined text-[20px]">&#xE04B;</span>
           </button>
+          <button id="loungeSwitchCamBtn" type="button" title="Switch camera (front / back)" class="hidden w-10 h-10 rounded-full flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-surface-control transition-colors cursor-pointer">
+            <span class="material-symbols-outlined text-[20px]">&#xEA38;</span>
+          </button>
           <div class="w-px h-6 bg-hairline-border mx-1"></div>
           <button id="loungeEndBtn" type="button" title="End call" class="w-10 h-10 rounded-full flex items-center justify-center text-text-secondary hover:text-on-error-container hover:bg-error-container transition-colors cursor-pointer">
             <span class="material-symbols-outlined text-[20px]">&#xF0BC;</span>
@@ -832,6 +836,7 @@
     <div class="flex items-center justify-center gap-1 px-2 py-1.5 border-t border-hairline-border">
       <button id="pipMicBtn" type="button" class="px-2 py-1 rounded-[6px] bg-surface-control hover:bg-surface-variant text-text-primary text-[11px] font-semibold cursor-pointer">Mic</button>
       <button id="pipCamBtn" type="button" class="px-2 py-1 rounded-[6px] bg-surface-control hover:bg-surface-variant text-text-primary text-[11px] font-semibold cursor-pointer">Cam</button>
+      <button id="pipSwitchCamBtn" type="button" title="Switch camera (front / back)" class="hidden px-2 py-1 rounded-[6px] bg-surface-control hover:bg-surface-variant text-text-primary text-[11px] font-semibold cursor-pointer"><span class="material-symbols-outlined text-[13px] leading-none align-middle">&#xEA38;</span> Switch</button>
       <button id="pipCornerBtn" type="button" class="px-2 py-1 rounded-[6px] bg-surface-control hover:bg-surface-variant text-text-primary text-[11px] font-semibold cursor-pointer">Corner</button>
       <button id="pipHideBtn" type="button" class="px-2 py-1 rounded-[6px] bg-surface-control hover:bg-surface-variant text-text-primary text-[11px] font-semibold cursor-pointer">Hide</button>
       <button id="pipEndBtn" type="button" class="px-2 py-1 rounded-[6px] bg-error-container hover:bg-error text-on-error-container text-[11px] font-semibold cursor-pointer">End</button>
@@ -924,7 +929,7 @@
 // =========================================================================
 
 const PEERJS_HOST_PREFIX = 'c2t-';
-const APP_VERSION = '2.2.1'; // v2.2.1: Stitch reskin (?v=26) on top of the Piped build (2.2.0) — same Piped redirect, new visual system
+const APP_VERSION = '2.2.2'; // v2.2.2: camera switch (front/back) + auto-rejoin on refresh (?v=27) — same Piped redirect + Stitch reskin
 // ICE servers: Google + Cloudflare STUN for direct links, PeerJS's own
 // TURN (its built-in default, which a custom config otherwise discards)
 // as the relay fallback. Open Relay was dropped 22 Nov 2026: its TLS
@@ -995,6 +1000,12 @@ const state = {
   mediaConn: null,
   camOn: false,
   micOn: true,
+  // v2.2.2 — camera switch: video inputs on this device, and which one
+  // is active. deviceId is preferred; facingMode is the fallback.
+  videoDeviceIds: [],
+  currentVideoDeviceId: null,
+  currentFacingMode: 'user',
+  switchingCamera: false,
   inLounge: false,
   pipCornerIdx: 0, // 0 bottom-right, 1 bottom-left, 2 top-right, 3 top-left
   pipVisible: false,
@@ -1026,6 +1037,7 @@ const dom = {
   loungePartnerName: document.getElementById('loungePartnerName'),
   loungeStatus: document.getElementById('loungeStatus'),
   loungeCamBtn: document.getElementById('loungeCamBtn'),
+  loungeSwitchCamBtn: document.getElementById('loungeSwitchCamBtn'),
   loungeMicBtn: document.getElementById('loungeMicBtn'),
   loungeStartBtn: document.getElementById('loungeStartBtn'),
   loungeNoVideoBtn: document.getElementById('loungeNoVideoBtn'),
@@ -1039,6 +1051,7 @@ const dom = {
   pipPartnerName: document.getElementById('pipPartnerName'),
   pipMicBtn: document.getElementById('pipMicBtn'),
   pipCamBtn: document.getElementById('pipCamBtn'),
+  pipSwitchCamBtn: document.getElementById('pipSwitchCamBtn'),
   pipCornerBtn: document.getElementById('pipCornerBtn'),
   pipHideBtn: document.getElementById('pipHideBtn'),
   pipEndBtn: document.getElementById('pipEndBtn'),
@@ -1305,6 +1318,13 @@ function parseHashRoomCode() {
   const hash = window.location.hash || '';
   const match = hash.match(/room=([A-Za-z0-9]{4,8})/i);
   return match ? match[1].toUpperCase() : '';
+}
+
+// Pure: which room (if any) should the app try to rejoin on load?
+// The URL hash wins over the saved last room; anything else → ''.
+function resolveStartupRoomCode(hashCode, savedCode) {
+  const code = (hashCode || savedCode || '').toUpperCase();
+  return /^[A-Z0-9]{4,8}$/.test(code) ? code : '';
 }
 
 // Local user id: generated once per browser, kept forever in localStorage.
@@ -1912,17 +1932,40 @@ async function startLocalCamera() {
     showToast('This browser cannot open the camera — you can still watch without video.', 'rose');
     return false;
   }
+  // Use the camera the user last switched to (v2.2.2); a saved deviceId
+  // that no longer exists falls back to the facing mode.
+  const size = { width: { ideal: 640 }, height: { ideal: 360 } };
+  const audioConstraints = { echoCancellation: true, noiseSuppression: true };
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: { width: { ideal: 640 }, height: { ideal: 360 }, facingMode: 'user' },
-      audio: { echoCancellation: true, noiseSuppression: true },
-    });
+    const videoConstraints = state.currentVideoDeviceId
+      ? { ...size, deviceId: { exact: state.currentVideoDeviceId } }
+      : { ...size, facingMode: state.currentFacingMode || 'user' };
+    let stream = null;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ video: videoConstraints, audio: audioConstraints });
+    } catch (e) {
+      if (!state.currentVideoDeviceId) throw e;
+      state.currentVideoDeviceId = null;
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: { ...size, facingMode: state.currentFacingMode || 'user' },
+        audio: audioConstraints,
+      });
+    }
     state.localStream = stream;
     state.camOn = true;
     state.micOn = true;
+    const videoTrack = stream.getVideoTracks()[0];
+    if (videoTrack) {
+      try {
+        const settings = videoTrack.getSettings() || {};
+        if (settings.deviceId) state.currentVideoDeviceId = settings.deviceId;
+        if (settings.facingMode) state.currentFacingMode = settings.facingMode;
+      } catch (_) {}
+    }
     if (dom.loungeLocalVideo) dom.loungeLocalVideo.srcObject = stream;
     if (dom.pipLocalVideo) dom.pipLocalVideo.srcObject = stream;
     updateCallButtons();
+    refreshVideoDevices();
     return true;
   } catch (e) {
     console.error('Camera error:', e);
@@ -1960,6 +2003,146 @@ function setCamOn(on) {
     state.localStream.getVideoTracks().forEach((t) => { t.enabled = state.camOn; });
   }
   updateCallButtons();
+}
+
+// --- Camera switch (v2.2.2) — front / back on phones ----------------------
+// Pure: the next camera in the list, cycling. Unknown current → first.
+function nextVideoDeviceId(ids, currentId) {
+  if (!ids || !ids.length) return null;
+  if (ids.length === 1) return ids[0];
+  const idx = ids.indexOf(currentId);
+  return ids[(idx + 1) % ids.length];
+}
+
+// Pure: flip between the two facing modes.
+function toggleFacingMode(mode) {
+  return mode === 'environment' ? 'user' : 'environment';
+}
+
+// Show the switch buttons only when this device actually has 2+ cameras
+// (a desktop with one webcam must never see a dead control).
+function updateSwitchCamButtons() {
+  const show = state.videoDeviceIds.length >= 2;
+  if (dom.loungeSwitchCamBtn) dom.loungeSwitchCamBtn.classList.toggle('hidden', !show);
+  if (dom.pipSwitchCamBtn) dom.pipSwitchCamBtn.classList.toggle('hidden', !show);
+}
+
+async function refreshVideoDevices() {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
+    state.videoDeviceIds = [];
+    updateSwitchCamButtons();
+    return;
+  }
+  try {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    state.videoDeviceIds = devices
+      .filter((d) => d.kind === 'videoinput')
+      .map((d) => d.deviceId)
+      .filter(Boolean);
+  } catch (_) {
+    state.videoDeviceIds = [];
+  }
+  updateSwitchCamButtons();
+}
+
+// Switch to the next camera, live: the call never drops and the audio
+// track is untouched. If the camera is off, only the remembered choice
+// changes — the next turn-on uses the new camera.
+async function switchCamera() {
+  if (state.switchingCamera) return;
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    showToast('This browser cannot switch cameras.', 'rose');
+    return;
+  }
+  // No stream yet (camera never started): just remember the next camera.
+  // No getUserMedia call here — no permission prompt, no camera flash.
+  if (!state.localStream) {
+    if (state.videoDeviceIds.length >= 2) {
+      state.currentVideoDeviceId = nextVideoDeviceId(state.videoDeviceIds, state.currentVideoDeviceId);
+    } else {
+      state.currentFacingMode = toggleFacingMode(state.currentFacingMode);
+    }
+    showToast('Camera switched — the other camera will be used next time it turns on.');
+    return;
+  }
+
+  let targetDeviceId = null;
+  let useDeviceId = false;
+  let targetFacing = null;
+  if (state.videoDeviceIds.length >= 2) {
+    targetDeviceId = nextVideoDeviceId(state.videoDeviceIds, state.currentVideoDeviceId);
+    useDeviceId = !!targetDeviceId;
+  }
+  if (!useDeviceId) targetFacing = toggleFacingMode(state.currentFacingMode);
+
+  const size = { width: { ideal: 640 }, height: { ideal: 360 } };
+  const constraints = useDeviceId
+    ? { ...size, deviceId: { exact: targetDeviceId } }
+    : { ...size, facingMode: targetFacing };
+
+  state.switchingCamera = true;
+  try {
+    let newStream = null;
+    try {
+      newStream = await navigator.mediaDevices.getUserMedia({ video: constraints });
+    } catch (e) {
+      // deviceId exact can fail on some phones — retry with facingMode.
+      if (useDeviceId) {
+        targetFacing = toggleFacingMode(state.currentFacingMode);
+        newStream = await navigator.mediaDevices.getUserMedia({ video: { ...size, facingMode: targetFacing } });
+        useDeviceId = false;
+      } else {
+        throw e;
+      }
+    }
+    const newTrack = newStream.getVideoTracks()[0];
+    if (!newTrack) {
+      newStream.getTracks().forEach((t) => t.stop());
+      throw new Error('no video track');
+    }
+    const oldTrack = state.localStream.getVideoTracks()[0] || null;
+    // Add the new track first, swap the live sender, then stop the old one.
+    state.localStream.addTrack(newTrack);
+    newTrack.enabled = state.camOn;
+    let senderOk = true;
+    if (state.mediaConn && state.mediaConn.peerConnection) {
+      try {
+        const sender = state.mediaConn.peerConnection.getSenders().find((s) => s.track && s.track.kind === 'video');
+        if (sender) await sender.replaceTrack(newTrack);
+      } catch (e) {
+        console.error('replaceTrack failed:', e);
+        senderOk = false;
+      }
+    }
+    if (!senderOk) {
+      // Roll back: the partner keeps the old track, the new one is dropped.
+      try { state.localStream.removeTrack(newTrack); } catch (_) {}
+      try { newTrack.stop(); } catch (_) {}
+      showToast('Could not switch the camera for your partner — keeping the current one.', 'rose');
+      return;
+    }
+    if (oldTrack) {
+      try { state.localStream.removeTrack(oldTrack); } catch (_) {}
+      try { oldTrack.stop(); } catch (_) {}
+    }
+    // Re-attach previews (same stream object; re-assigning fixes browsers
+    // that drop the frame on a track swap).
+    if (dom.loungeLocalVideo) dom.loungeLocalVideo.srcObject = state.localStream;
+    if (dom.pipLocalVideo) dom.pipLocalVideo.srcObject = state.localStream;
+    // Remember what actually won, so the next switch cycles correctly.
+    try {
+      const settings = newTrack.getSettings() || {};
+      if (settings.deviceId) state.currentVideoDeviceId = settings.deviceId;
+      if (settings.facingMode) state.currentFacingMode = settings.facingMode;
+      else if (!useDeviceId && targetFacing) state.currentFacingMode = targetFacing;
+    } catch (_) {}
+    debugLog('camera switched');
+  } catch (e) {
+    console.error('Camera switch error:', e);
+    showToast('Could not switch camera — keeping the current one.', 'rose');
+  } finally {
+    state.switchingCamera = false;
+  }
 }
 
 // --- Pre-Show Face-to-Face Lounge ---------------------------------------
@@ -2893,7 +3076,11 @@ function enterTheaterUI(code) {
   state.lastSeqBySender = {};
   state.lastWhisperCount = 0;
   state.lastPongAt = 0;
-  window.location.hash = `room=${code}`;
+  // v2.2.2 — remember this room so a refresh rejoins it, and keep the
+  // code in the URL (replaceState: no reload, no history entry).
+  try { localStorage.setItem('c2t-last-room', code); } catch (_) {}
+  try { history.replaceState(null, '', '#room=' + code); }
+  catch (_) { window.location.hash = `room=${code}`; }
   dom.roomCodeBadge.textContent = code;
   dom.headerUserName.textContent = state.userName;
 
@@ -3588,6 +3775,10 @@ dom.leaveRoomBtn.addEventListener('click', () => {
   endMediaCall();
   stopLocalCamera();
   state.inLounge = false;
+  // Leaving is deliberate: forget the room so the next load does NOT
+  // auto-rejoin it, and drop the code from the URL.
+  try { localStorage.removeItem('c2t-last-room'); } catch (_) {}
+  try { history.replaceState(null, '', window.location.pathname); } catch (_) {}
   cleanupPeer();
   executeLocalPause();
   if (dom.loungeView) dom.loungeView.classList.add('hidden');
@@ -3612,6 +3803,8 @@ dom.loungeCamBtn.addEventListener('click', () => {
   }
 });
 dom.loungeMicBtn.addEventListener('click', () => setMicOn(!state.micOn));
+dom.loungeSwitchCamBtn.addEventListener('click', () => { switchCamera(); });
+dom.pipSwitchCamBtn.addEventListener('click', () => { switchCamera(); });
 dom.loungeStartBtn.addEventListener('click', exitLoungeToTheater);
 dom.loungeNoVideoBtn.addEventListener('click', exitLoungeToTheater);
 dom.pipMicBtn.addEventListener('click', () => setMicOn(!state.micOn));
@@ -3933,6 +4126,25 @@ window.addEventListener('DOMContentLoaded', () => {
     dom.detectedRoomCodeText.textContent = invitedCode;
     dom.inviteDetectedBanner.classList.remove('hidden');
   }
+  // v2.2.2 — auto-rejoin: the hash wins, else the last room saved on this
+  // device. With a code AND a name, rejoin through the SAME path the Join
+  // button uses; with a code but no name, prefill the code and focus the
+  // name field. First visit (nothing saved): welcome behaves as before.
+  let savedRoom = '';
+  try { savedRoom = localStorage.getItem('c2t-last-room') || ''; } catch (_) {}
+  const startupCode = resolveStartupRoomCode(invitedCode, savedRoom);
+  if (startupCode && (dom.userNameInput.value || '').trim()) {
+    dom.joinCodeInput.value = startupCode;
+    handleJoinRoom();
+  } else if (startupCode) {
+    dom.joinCodeInput.value = startupCode;
+    dom.userNameInput.focus();
+  }
+  // Camera list: refresh when devices plug/unplug (v2.2.2).
+  if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) {
+    navigator.mediaDevices.addEventListener('devicechange', () => { refreshVideoDevices(); });
+  }
+  refreshVideoDevices();
   dom.authInitStatus.innerHTML = `<span class="w-2 h-2 rounded-full bg-presence-indicator"></span><span class="text-presence-indicator/90">Peer-to-peer ready · Memories saved on this device + .jsonl file — no cloud yet</span>`;
   loadYouTubeApiScript();
 });
