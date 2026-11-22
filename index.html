@@ -971,7 +971,7 @@
 // =========================================================================
 
 const PEERJS_HOST_PREFIX = 'c2t-';
-const APP_VERSION = '2.4.7'; // v2.4.3: undecodable-video detection — HEVC/DivX video with playable audio fires no error and plays sound over a black screen; the app now says so at loadedmetadata and offers the converter; a fatal HLS error gets a banner; a local .m3u8 playlist gets a plain message instead of a dead player (its segments can't resolve from a blob URL) (?v=46)
+const APP_VERSION = '2.4.8'; // v2.4.3: undecodable-video detection — HEVC/DivX video with playable audio fires no error and plays sound over a black screen; the app now says so at loadedmetadata and offers the converter; a fatal HLS error gets a banner; a local .m3u8 playlist gets a plain message instead of a dead player (its segments can't resolve from a blob URL) (?v=46)
 // ICE servers: Google + Cloudflare STUN for direct links, PeerJS's own
 // TURN (its built-in default, which a custom config otherwise discards)
 // as the relay fallback. Open Relay was dropped 22 Nov 2026: its TLS
@@ -2091,7 +2091,7 @@ function warnIfEchoCancellationOff(stream) {
   try { s = audioTrack.getSettings() || {}; } catch (_) {}
   if (s.echoCancellation !== false) return false;
   state.ecWarned = true;
-  showToast('Echo cancellation is off on this phone — use earphones or turn the speaker down, or your partner will hear an echo.', 'rose');
+  try { showToast('Echo cancellation is off on this phone — use earphones or turn the speaker down, or your partner will hear an echo.', 'rose'); } catch (_) {}
   return true;
 }
 
@@ -2415,7 +2415,6 @@ async function startLocalCamera() {
       });
     }
     state.localStream = stream;
-    warnIfEchoCancellationOff(stream);
     state.camOn = true;
     state.micOn = true;
     const videoTrack = stream.getVideoTracks()[0];
@@ -2431,6 +2430,11 @@ async function startLocalCamera() {
     updateCallButtons();
     refreshVideoDevices();
     attachCameraToCall();
+    // Last, and never allowed to break the camera: the echo warning runs
+    // after the camera is fully up, inside its own try/catch. In v2.4.7
+    // it sat inside the start try-block, so any failure in it killed the
+    // whole camera start even though the camera had opened fine.
+    try { warnIfEchoCancellationOff(stream); } catch (_) {}
     return true;
   } catch (e) {
     console.error('Camera error:', e);
