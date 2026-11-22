@@ -971,7 +971,7 @@
 // =========================================================================
 
 const PEERJS_HOST_PREFIX = 'c2t-';
-const APP_VERSION = '2.4.5'; // v2.4.3: undecodable-video detection — HEVC/DivX video with playable audio fires no error and plays sound over a black screen; the app now says so at loadedmetadata and offers the converter; a fatal HLS error gets a banner; a local .m3u8 playlist gets a plain message instead of a dead player (its segments can't resolve from a blob URL) (?v=46)
+const APP_VERSION = '2.4.6'; // v2.4.3: undecodable-video detection — HEVC/DivX video with playable audio fires no error and plays sound over a black screen; the app now says so at loadedmetadata and offers the converter; a fatal HLS error gets a banner; a local .m3u8 playlist gets a plain message instead of a dead player (its segments can't resolve from a blob URL) (?v=46)
 // ICE servers: Google + Cloudflare STUN for direct links, PeerJS's own
 // TURN (its built-in default, which a custom config otherwise discards)
 // as the relay fallback. Open Relay was dropped 22 Nov 2026: its TLS
@@ -1038,6 +1038,8 @@ const state = {
   partnerUid: '',
   lastPongAt: 0,
   lastRemoteApplied: null, // last playback state applied FROM the partner — echoes of it are swallowed, not rebroadcast
+  lastRemotePauseAt: 0, // local ms when we last applied the partner's pause — a PLAYING echo from our own player inside 5s of it is swallowed, not rebroadcast
+  userPlayIntent: false, // set by the play button / countdown / movie-control before a deliberate play, so the pause-echo guard never swallows a real press
   // v2 — voice & video calling (WebRTC media over the same PeerJS link)
   localStream: null,
   remoteStream: null,
@@ -2836,7 +2838,7 @@ function handlePeerMessage(msg) {
     // The partner is watching our shared file and pressed a transport
     // control — they have no file of their own, so drive ours.
     if (!state.movieSharing) return;
-    if (msg.action === 'play') executeLocalPlay();
+    if (msg.action === 'play') { state.userPlayIntent = true; executeLocalPlay(); }
     else if (msg.action === 'pause') executeLocalPause();
     else if (msg.action === 'seek' && typeof msg.currentTime === 'number') executeLocalSeek(msg.currentTime);
     return;
@@ -3177,6 +3179,15 @@ function mountYouTubePlayer(videoId) {
       onStateChange: (event) => {
         if (state.isRemoteSync) return;
         if (event.data === YT.PlayerState.PLAYING) {
+          // Echo of the partner's pause: YouTube can resume on its own
+          // after buffering even though pauseVideo() was called — re-pause
+          // instead of broadcasting a 'played' line that re-plays the
+          // partner. A deliberate press sets userPlayIntent first.
+          if (!state.userPlayIntent && state.lastRemotePauseAt && Date.now() - state.lastRemotePauseAt < 5000) {
+            if (state.ytPlayer && typeof state.ytPlayer.pauseVideo === 'function') state.ytPlayer.pauseVideo();
+            updatePlayButtonUI(false);
+            return;
+          }
           // Refresh the banner title now that the video is actually playing:
           // getVideoData() is empty at onReady, and loadVideoById never fires
           // onReady again, so without this the "Loading..." text sticks.
@@ -3730,6 +3741,14 @@ function updateTimelineUI() {
 
 // HTML5 Video Native Event Listeners
 dom.html5VideoPlayer.addEventListener('play', () => {
+  // Echo of the partner's pause — re-pause instead of broadcasting a
+  // 'played' line that re-plays the partner. Shared-movie receivers are
+  // exempt: their 'play' is the stream starting, never an echo.
+  if (!state.userPlayIntent && !state.receivingMovie && state.lastRemotePauseAt && Date.now() - state.lastRemotePauseAt < 5000) {
+    dom.html5VideoPlayer.pause();
+    updatePlayButtonUI(false);
+    return;
+  }
   updatePlayButtonUI(true);
   // A movie receiver's own play event is just the stream starting — it
   // must never broadcast a play back to the sender.
@@ -3807,6 +3826,17 @@ function engageRemoteSyncLock() {
 
 function broadcastPlaybackChange(isPlaying, currentTime, actionLabel = null) {
   if (!state.roomCode || state.mediaType === 'none') return;
+  // Pause echo: within 5s of applying the partner's pause, a PLAYING
+  // broadcast from a raw player event is the player echoing (YouTube
+  // resuming on its own after buffering, not a button press) — swallow
+  // it instead of sending a 'played' line that re-plays the partner.
+  // A deliberate play sets userPlayIntent first and passes through
+  // (the raw play broadcast consumes the intent); labelled broadcasts
+  // (heartbeats, seeks, countdown) are never raw echoes.
+  if (isPlaying && !actionLabel) {
+    if (!state.userPlayIntent && state.lastRemotePauseAt && Date.now() - state.lastRemotePauseAt < 5000) return;
+    state.userPlayIntent = false;
+  }
   // Echo guard: when we apply the partner's play/pause, our own player
   // fires the same event back — YouTube's PLAYING often comes seconds
   // later, after buffering, long past the 750ms remote-sync lock — and
@@ -3896,6 +3926,19 @@ function applyRemotePlaybackState(playback, forceImmediate = false) {
     }
   }
 
+  // A heartbeat only says "still playing" — it must never START playback.
+  // When either side pauses, the other side's 10s heartbeat can still
+  // fire in the window before it processes the pause (or while its player
+  // still reports playing), and that stale playing-heartbeat arriving
+  // after our pause re-plays us by itself. A real 'played' line still
+  // resumes; forced re-syncs (room entry, Re-Sync button) bypass this so
+  // a late joiner still auto-plays from the saved state. Shared-movie
+  // receivers are exempt: their clock never touches the element, so a
+  // heartbeat can't re-play anything there.
+  if (!forceImmediate && !state.receivingMovie && playback.actionLabel === 'heartbeat' && playback.isPlaying && !isPlayerCurrentlyPlaying()) {
+    return;
+  }
+
   engageRemoteSyncLock();
 
   // Calculate elapsed time since partner triggered update if playing.
@@ -3916,6 +3959,7 @@ function applyRemotePlaybackState(playback, forceImmediate = false) {
   // remote applies count — not forced re-syncs of our own state.
   if (!forceImmediate && playback.updatedBy && playback.updatedBy !== state.userId) {
     state.lastRemoteApplied = { isPlaying: playback.isPlaying, currentTime: targetTime, at: Date.now() };
+    if (!playback.isPlaying) state.lastRemotePauseAt = Date.now();
   }
 
   // Receiving a shared movie: our player is a live stream with no
@@ -4276,6 +4320,7 @@ function runLocalCountdownSequence(startTimestamp = Date.now()) {
     } else if (step === 0) {
       renderStep('GO', 'Enjoy the show!');
       engageRemoteSyncLock();
+      state.userPlayIntent = true;
       executeLocalPlay();
     } else {
       clearInterval(state.countdownInterval);
@@ -4982,8 +5027,10 @@ dom.playPauseBtn.addEventListener('click', () => {
     return;
   }
   if (isPlayerCurrentlyPlaying()) {
+    state.userPlayIntent = false;
     executeLocalPause();
   } else {
+    state.userPlayIntent = true;
     executeLocalPlay();
   }
 });
