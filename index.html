@@ -971,7 +971,7 @@
 // =========================================================================
 
 const PEERJS_HOST_PREFIX = 'c2t-';
-const APP_VERSION = '2.4.3'; // v2.4.3: undecodable-video detection — HEVC/DivX video with playable audio fires no error and plays sound over a black screen; the app now says so at loadedmetadata and offers the converter; a fatal HLS error gets a banner; a local .m3u8 playlist gets a plain message instead of a dead player (its segments can't resolve from a blob URL) (?v=46)
+const APP_VERSION = '2.4.4'; // v2.4.3: undecodable-video detection — HEVC/DivX video with playable audio fires no error and plays sound over a black screen; the app now says so at loadedmetadata and offers the converter; a fatal HLS error gets a banner; a local .m3u8 playlist gets a plain message instead of a dead player (its segments can't resolve from a blob URL) (?v=46)
 // ICE servers: Google + Cloudflare STUN for direct links, PeerJS's own
 // TURN (its built-in default, which a custom config otherwise discards)
 // as the relay fallback. Open Relay was dropped 22 Nov 2026: its TLS
@@ -3452,49 +3452,44 @@ function mountHtml5Video(srcUrl, titleLabel, onErrorOverride, hintFileName = '')
 // cannot play — MKV with AC3/DTS audio, MOV/TS containers, AVI/WMV.
 // Fast Fix copies the original video stream untouched and converts only
 // the audio to AAC (seconds); Full Convert re-encodes to H.264/AAC.
-// Runs only when he taps a convert button; the engine (~30MB) downloads
+// Runs only when he taps a convert button; the engine (~25MB) downloads
 // once on first use, and the converted file stays on this device.
+//
+// Engine choice (verified 22 Nov 2026): @ffmpeg/ffmpeg 0.12 + the
+// multi-threaded core HANGS forever on load() here — that core needs
+// SharedArrayBuffer, which needs COOP/COEP headers GitHub Pages cannot
+// send. The 0.11 single-threaded core needs no special headers.
+// Two 0.11 quirks, both verified live: the ST core exports `main`,
+// not the `proxy_main` the wrapper defaults to (mainName: 'main'),
+// and corePath must be an ABSOLUTE URL — the wrapper resolves a
+// relative path against a file:// base and the fetch fails.
 async function loadBrowserFFmpeg() {
   if (state.ffmpegInstance) return state.ffmpegInstance;
 
-  if (!window.FFmpegWASM) {
+  if (!window.FFmpeg) {
     await new Promise((resolve, reject) => {
       const s = document.createElement('script');
-      s.src = 'https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js';
+      s.src = 'https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.11.0/dist/ffmpeg.min.js';
       s.onload = resolve;
       s.onerror = () => reject(new Error('Could not load the converter from the network. Check the connection and try again.'));
       document.head.appendChild(s);
     });
   }
 
-  const { FFmpeg } = window.FFmpegWASM;
-  const ffmpeg = new FFmpeg();
+  const { createFFmpeg } = window.FFmpeg;
+  const ffmpeg = createFFmpeg({
+    log: false,
+    corePath: 'https://cdn.jsdelivr.net/npm/@ffmpeg/core-st@0.11.1/dist/ffmpeg-core.js',
+    mainName: 'main'
+  });
 
-  ffmpeg.on('progress', ({ progress }) => {
-    const pct = Math.max(5, Math.min(99, Math.round((progress || 0) * 100)));
+  ffmpeg.setProgress(({ ratio }) => {
+    const pct = Number.isFinite(ratio) ? Math.max(5, Math.min(99, Math.round(ratio * 100))) : 8;
     dom.transcodeProgressBar.style.width = pct + '%';
     dom.transcodePercentText.textContent = 'Processing video: ' + pct + '%';
   });
 
-  // Fetch the worker, core and wasm and wrap them in blob URLs so the
-  // worker loads on any origin, including the installed app.
-  const fetchToBlobUrl = async (url, mimeType) => {
-    const res = await fetch(url);
-    if (!res.ok) throw new Error('Failed to fetch ' + url);
-    const buf = await res.arrayBuffer();
-    return URL.createObjectURL(new Blob([buf], { type: mimeType }));
-  };
-
-  const baseFFmpeg = 'https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/umd';
-  const baseCore = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/umd';
-
-  const [classWorkerURL, coreURL, wasmURL] = await Promise.all([
-    fetchToBlobUrl(baseFFmpeg + '/814.ffmpeg.js', 'text/javascript'),
-    fetchToBlobUrl(baseCore + '/ffmpeg-core.js', 'text/javascript'),
-    fetchToBlobUrl(baseCore + '/ffmpeg-core.wasm', 'application/wasm')
-  ]);
-
-  await ffmpeg.load({ classWorkerURL, coreURL, wasmURL });
+  await ffmpeg.load();
 
   state.ffmpegInstance = ffmpeg;
   return ffmpeg;
@@ -3525,8 +3520,7 @@ async function transcodeLocalFileToMp4(mode = 'fast') {
   try {
     const ffmpeg = await loadBrowserFFmpeg();
     dom.transcodePercentText.textContent = 'Reading the movie into memory...';
-    const fileBytes = new Uint8Array(await rawFile.arrayBuffer());
-    await ffmpeg.writeFile(inputFileName, fileBytes);
+    ffmpeg.FS('writeFile', inputFileName, await window.FFmpeg.fetchFile(rawFile));
 
     const fastArgs = ['-i', inputFileName, '-map', '0:v:0', '-map', '0:a:0?', '-c:v', 'copy', '-c:a', 'aac', '-b:a', '192k', '-movflags', '+faststart', outputFileName];
     const fullArgs = ['-i', inputFileName, '-map', '0:v:0', '-map', '0:a:0?', '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '23', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '192k', '-movflags', '+faststart', outputFileName];
@@ -3537,10 +3531,9 @@ async function transcodeLocalFileToMp4(mode = 'fast') {
     // back another unplayable file. Probe the codec first and pick the
     // mode that actually works, whatever button he tapped.
     const logLines = [];
-    const onLog = ({ message }) => { if (message) logLines.push(message); };
-    ffmpeg.on('log', onLog);
-    try { await ffmpeg.exec(['-i', inputFileName]); } catch (_) {}
-    if (typeof ffmpeg.off === 'function') { try { ffmpeg.off('log', onLog); } catch (_) {} }
+    ffmpeg.setLogger(({ message }) => { if (message) logLines.push(message); });
+    try { await ffmpeg.run('-i', inputFileName); } catch (_) {}
+    ffmpeg.setLogger(() => {});
     const codecMatch = logLines.join('\n').match(/Stream #\d+:\d+.*Video:\s*([a-z0-9_]+)/i);
     const videoCodec = codecMatch ? codecMatch[1].toLowerCase() : '';
     const effectiveMode = convertModeForCodec(videoCodec, mode);
@@ -3549,27 +3542,38 @@ async function transcodeLocalFileToMp4(mode = 'fast') {
       dom.transcodeSubtitle.textContent = 'This file uses ' + (videoCodec || 'an unsupported') + ' video — converting it to H.264 + AAC MP4...';
     }
 
-    let exitCode = await ffmpeg.exec(effectiveMode === 'fast' ? fastArgs : fullArgs);
-    if (exitCode !== 0 && effectiveMode === 'fast') {
+    // 0.11 run() throws "Program terminated with exit(0)" even on
+    // SUCCESS — the Emscripten exit reaches the wrapper as an
+    // exception. So a throw means nothing: the output file existing
+    // and non-empty is the only thing that decides success.
+    const runConvert = async (args) => {
+      try { await ffmpeg.run(...args); } catch (_) {}
+      try {
+        const out = ffmpeg.FS('readFile', outputFileName);
+        return out && out.length > 0;
+      } catch (_) { return false; }
+    };
+    let converted = await runConvert(effectiveMode === 'fast' ? fastArgs : fullArgs);
+    if (!converted && effectiveMode === 'fast') {
       // The video codec could not be copied into MP4 — escalate to a
       // full H.264/AAC transcode instead of failing.
       dom.transcodeTitle.textContent = 'Video Codec Needs Full Conversion...';
       dom.transcodeSubtitle.textContent = 'Converting the video stream to H.264 + AAC MP4...';
-      exitCode = await ffmpeg.exec(fullArgs);
+      converted = await runConvert(fullArgs);
     }
-    if (exitCode !== 0) throw new Error('The converter could not decode this video file.');
+    if (!converted) throw new Error('The converter could not decode this video file.');
 
-    const outData = await ffmpeg.readFile(outputFileName);
+    const outData = ffmpeg.FS('readFile', outputFileName);
     try {
-      await ffmpeg.deleteFile(inputFileName);
-      await ffmpeg.deleteFile(outputFileName);
+      ffmpeg.FS('unlink', inputFileName);
+      ffmpeg.FS('unlink', outputFileName);
     } catch (_) {}
 
     if (state.convertedObjectUrl) {
       try { URL.revokeObjectURL(state.convertedObjectUrl); } catch (_) {}
     }
 
-    const mp4Blob = new Blob([outData.buffer], { type: 'video/mp4' });
+    const mp4Blob = new Blob([outData], { type: 'video/mp4' });
     const mp4Url = URL.createObjectURL(mp4Blob);
     state.convertedObjectUrl = mp4Url;
     state.mediaUrl = mp4Url;
@@ -3588,6 +3592,13 @@ async function transcodeLocalFileToMp4(mode = 'fast') {
     showToast('Could not convert the file in the browser — see the banner for details.', 'rose');
   } finally {
     state.isTranscoding = false;
+    // Fresh engine per conversion: in 0.11 the one-command flag only
+    // resets when the "FFMPEG_END" log line arrives, and a successful
+    // run often throws "Program terminated with exit(0)" first —
+    // leaving the instance permanently locked ("can only run one
+    // command at a time"). Discarding it costs one wasm compile
+    // next time; the CDN files come from the browser cache.
+    state.ffmpegInstance = null;
     dom.transcodeOverlay.classList.add('hidden');
   }
 }
