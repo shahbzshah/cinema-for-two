@@ -349,16 +349,16 @@
         <span class="hidden xl:flex items-center gap-1.5 font-label-sm text-label-sm text-text-muted shrink-0">YOU&nbsp;·&nbsp;<span id="headerUserName" class="text-text-secondary">You</span></span>
       </div>
 
-      <nav class="hidden lg:flex items-center gap-space-lg" aria-label="Views">
-        <a href="#" class="app-nav-link app-nav-active transition-colors py-1 font-title-sm text-title-sm text-text-secondary hover:text-text-primary" data-nav-view="theater" aria-current="page">Screening Room</a>
-        <a href="#" class="app-nav-link transition-colors py-1 font-body-md text-body-md text-text-secondary hover:text-text-primary" data-nav-view="lounge">Pre-Show Lounge</a>
-        <a href="#" class="app-nav-link transition-colors py-1 font-body-md text-body-md text-text-secondary hover:text-text-primary" data-nav-view="passport">Shared Passport</a>
+      <nav class="hidden xl:flex items-center gap-space-lg shrink-0" aria-label="Views">
+        <a href="#" class="app-nav-link app-nav-active transition-colors py-1 font-title-sm text-title-sm text-text-secondary hover:text-text-primary whitespace-nowrap" data-nav-view="theater" aria-current="page">Screening Room</a>
+        <a href="#" class="app-nav-link transition-colors py-1 font-body-md text-body-md text-text-secondary hover:text-text-primary whitespace-nowrap" data-nav-view="lounge">Pre-Show Lounge</a>
+        <a href="#" class="app-nav-link transition-colors py-1 font-body-md text-body-md text-text-secondary hover:text-text-primary whitespace-nowrap" data-nav-view="passport">Shared Passport</a>
       </nav>
 
       <div class="flex items-center gap-space-sm sm:gap-space-md min-w-0 shrink-0">
         <div id="presenceBadge" class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary-container/10 border border-primary-container/25 text-xs font-medium text-primary-container">
           <span id="presenceDot" class="w-2 h-2 rounded-full bg-primary-container animate-pulse shrink-0"></span>
-          <span id="presenceText" class="hidden sm:inline truncate">Waiting for partner to join...</span>
+          <span id="presenceText" class="hidden 2xl:inline truncate">Waiting for partner to join...</span>
         </div>
         <button id="showFacesBtn" type="button" class="hidden px-3 py-1.5 rounded-full bg-primary-container/15 hover:bg-primary-container/25 border border-primary-container/30 text-primary-container text-xs font-medium transition cursor-pointer shrink-0">Show faces</button>
         <button id="copyInviteBtn" type="button" class="h-9 px-space-md bg-surface-control hover:bg-surface-variant text-text-primary border border-hairline-border rounded text-body-sm font-title-sm flex items-center gap-space-xs transition-colors cursor-pointer shrink-0">
@@ -371,11 +371,11 @@
       </div>
     </div>
     <!-- Mobile nav (same three real views, second row under the header) -->
-    <div class="lg:hidden border-t border-hairline-border">
-      <div class="px-gutter flex items-center gap-6 h-10">
-        <a href="#" class="app-nav-link app-nav-active transition-colors py-1 font-title-sm text-title-sm text-text-secondary hover:text-text-primary" data-nav-view="theater" aria-current="page">Screening Room</a>
-        <a href="#" class="app-nav-link transition-colors py-1 font-body-md text-body-md text-text-secondary hover:text-text-primary" data-nav-view="lounge">Pre-Show Lounge</a>
-        <a href="#" class="app-nav-link transition-colors py-1 font-body-md text-body-md text-text-secondary hover:text-text-primary" data-nav-view="passport">Shared Passport</a>
+    <div class="xl:hidden border-t border-hairline-border">
+      <div class="px-gutter flex items-center gap-6 h-10 overflow-x-auto">
+        <a href="#" class="app-nav-link app-nav-active transition-colors py-1 font-title-sm text-title-sm text-text-secondary hover:text-text-primary whitespace-nowrap shrink-0" data-nav-view="theater" aria-current="page">Screening Room</a>
+        <a href="#" class="app-nav-link transition-colors py-1 font-body-md text-body-md text-text-secondary hover:text-text-primary whitespace-nowrap shrink-0" data-nav-view="lounge">Pre-Show Lounge</a>
+        <a href="#" class="app-nav-link transition-colors py-1 font-body-md text-body-md text-text-secondary hover:text-text-primary whitespace-nowrap shrink-0" data-nav-view="passport">Shared Passport</a>
       </div>
     </div>
   </header>
@@ -384,7 +384,7 @@
        VIEW 1: MAIN SCREENING ROOM (theater)
        ====================================================================== -->
   <div id="theaterView" class="hidden min-h-screen flex flex-col">
-    <div class="w-full px-gutter md:px-margin-desktop pt-28 lg:pt-16 pb-28 lg:pb-12 flex-1">
+    <div class="w-full px-gutter md:px-margin-desktop pt-28 xl:pt-16 pb-28 lg:pb-12 flex-1">
       <!-- Metadata strip: real title + real sync state (no fake film data) -->
       <div class="flex flex-wrap items-end justify-between gap-space-md border-b border-hairline-border pb-space-sm">
         <div class="flex flex-col gap-space-xs min-w-0">
@@ -695,7 +695,7 @@
        the removed v3 options stay removed).
        ====================================================================== -->
   <div id="loungeView" class="hidden min-h-screen flex flex-col">
-    <div class="w-full max-w-[880px] mx-auto px-gutter md:px-margin-desktop pt-28 lg:pt-16 pb-12 flex-1">
+    <div class="w-full max-w-[880px] mx-auto px-gutter md:px-margin-desktop pt-28 xl:pt-16 pb-12 flex-1">
       <div class="text-center mb-6">
         <p class="font-label-sm text-label-sm text-text-muted uppercase tracking-wider mb-2">Pre-Show Lounge</p>
         <h2 class="font-headline-md text-display-lg-mobile sm:text-display-lg text-text-primary tracking-tight">Face to face before the film</h2>
@@ -837,7 +837,7 @@
        Count + average are real, computed from the log.
        ====================================================================== -->
   <div id="passportView" class="hidden min-h-screen flex flex-col">
-    <div class="w-full px-gutter md:px-margin-desktop pt-28 lg:pt-16 pb-12 flex-1">
+    <div class="w-full px-gutter md:px-margin-desktop pt-28 xl:pt-16 pb-12 flex-1">
       <div class="flex flex-wrap items-end justify-between gap-space-md border-b border-hairline-border pb-space-md">
         <div class="flex flex-col gap-space-xs">
           <p class="font-label-sm text-label-sm text-text-muted uppercase tracking-wider">Archive · Vol. I</p>
@@ -971,7 +971,7 @@
 // =========================================================================
 
 const PEERJS_HOST_PREFIX = 'c2t-';
-const APP_VERSION = '2.4.4'; // v2.4.3: undecodable-video detection — HEVC/DivX video with playable audio fires no error and plays sound over a black screen; the app now says so at loadedmetadata and offers the converter; a fatal HLS error gets a banner; a local .m3u8 playlist gets a plain message instead of a dead player (its segments can't resolve from a blob URL) (?v=46)
+const APP_VERSION = '2.4.5'; // v2.4.3: undecodable-video detection — HEVC/DivX video with playable audio fires no error and plays sound over a black screen; the app now says so at loadedmetadata and offers the converter; a fatal HLS error gets a banner; a local .m3u8 playlist gets a plain message instead of a dead player (its segments can't resolve from a blob URL) (?v=46)
 // ICE servers: Google + Cloudflare STUN for direct links, PeerJS's own
 // TURN (its built-in default, which a custom config otherwise discards)
 // as the relay fallback. Open Relay was dropped 22 Nov 2026: its TLS
