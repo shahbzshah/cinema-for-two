@@ -945,7 +945,7 @@
 // =========================================================================
 
 const PEERJS_HOST_PREFIX = 'c2t-';
-const APP_VERSION = '2.3.9'; // v2.3.9: lag fix — camera call capped at 400kbps, movie share at 800kbps + 20fps capture, camera capture 15fps (was uncapped 640x360 @30fps + a second full-rate movie stream, which froze the camera on mobile data) (?v=42)
+const APP_VERSION = '2.4.0'; // v2.4.0: video-error recovery — a dead stream no longer leaves a dead screen: the ad-free stream falls back to the YouTube embed when it dies mid-play, a stale saved stream re-resolves from its YouTube id, and a direct link that drops on the network retries once (?v=43)
 // ICE servers: Google + Cloudflare STUN for direct links, PeerJS's own
 // TURN (its built-in default, which a custom config otherwise discards)
 // as the relay fallback. Open Relay was dropped 22 Nov 2026: its TLS
@@ -975,6 +975,7 @@ const state = {
   mediaTitle: '',
   isRemoteSync: false,
   skipMetadataResume: false, // a fresh pick sets this: the room's saved playback belongs to the previous media, not the new one
+  videoErrorRetried: false, // the current HTML5 mount already used its one network-error retry — a second failure shows the banner
   remoteSyncTimer: null,
   lastProcessedSeq: 0,
   lastSeqBySender: {}, // highest playback seq seen per sender — seq counters are per-device, never compare across devices
@@ -1345,8 +1346,16 @@ async function mountYouTubeAdFree(videoId, titleLabel) {
     if (piped) {
       const title = piped.title || titleLabel || `YouTube (${videoId})`;
       mountHtml5Video(piped.streamUrl, title, () => {
+        // The ad-free stream died after it started playing (Piped proxy
+        // dropped, or the stream URL expired). The YouTube id is known,
+        // so fall back to the YouTube embed instead of leaving a dead
+        // screen and asking him to paste the link again.
+        state.mediaType = 'youtube';
+        state.mediaUrl = videoId;
         dom.nowPlayingBanner.classList.remove('hidden');
-        dom.nowPlayingTitle.textContent = 'The ad-free stream stopped — paste the YouTube link again to retry.';
+        dom.nowPlayingTitle.textContent = 'Ad-free stream stopped — switched to YouTube.';
+        showToast('Ad-free stream stopped — switched to YouTube.', 'gold');
+        mountYouTubePlayer(videoId);
       });
       const playable = await waitForPlayable(dom.html5VideoPlayer, 10000);
       if (playable) {
@@ -3153,6 +3162,19 @@ function mediaErrorMessage(code, isLocalFile) {
   return null;
 }
 
+// Pure: what should happen when the HTML5 player errors?
+// - 'embed' — the YouTube id is known, so the dead stream is replaced:
+//   a fresh ad-free resolve (or the YouTube embed inside it). Covers a
+//   Piped stream URL that went stale and a stream that died mid-play.
+// - 'retry' — a direct link failed on the network once: reload the same
+//   URL once (mobile data drops mid-load). A second failure shows the banner.
+// - 'banner' — anything else: show the plain-language banner.
+function videoErrorRecovery(videoId, code, alreadyRetried) {
+  if (videoId) return 'embed';
+  if (code === 2 && !alreadyRetried) return 'retry';
+  return 'banner';
+}
+
 function showMediaError(message) {
   dom.mediaErrorText.textContent = message;
   dom.mediaErrorBanner.classList.remove('hidden');
@@ -3174,6 +3196,7 @@ function mountHtml5Video(srcUrl, titleLabel, onErrorOverride) {
   dom.emptyPlayerPlaceholder.classList.add('hidden');
   hideMediaError();
   hideUnmuteOverlay();
+  state.videoErrorRetried = false; // a fresh mount gets a fresh one-time network retry
   // A fresh mount starts unmuted — if autoplay with sound is blocked
   // again, the play() catch shows the unmute overlay for this video.
   dom.html5VideoPlayer.muted = false;
@@ -3198,6 +3221,23 @@ function mountHtml5Video(srcUrl, titleLabel, onErrorOverride) {
   } else {
     dom.html5VideoPlayer.onerror = () => {
       const code = dom.html5VideoPlayer.error && dom.html5VideoPlayer.error.code;
+      const knownVideoId = state.roomData && state.roomData.media && state.roomData.media.videoId;
+      const action = videoErrorRecovery(knownVideoId, code, state.videoErrorRetried);
+      if (action === 'embed') {
+        // The room's media line remembers the YouTube id — resolve a
+        // fresh ad-free stream (or the embed) instead of mounting a
+        // stale stream URL that can never play again.
+        mountYouTubeAdFree(knownVideoId, state.mediaTitle || 'YouTube Feature');
+        return;
+      }
+      if (action === 'retry') {
+        // A direct link dropped on the network once — reload the same
+        // URL once before giving up and showing the banner.
+        state.videoErrorRetried = true;
+        showToast('Connection dropped — retrying the video…', 'gold');
+        try { dom.html5VideoPlayer.load(); } catch (_) {}
+        return;
+      }
       const specific = mediaErrorMessage(code, state.mediaType === 'local');
       if (specific) {
         showMediaError(specific);
