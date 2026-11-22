@@ -971,7 +971,7 @@
 // =========================================================================
 
 const PEERJS_HOST_PREFIX = 'c2t-';
-const APP_VERSION = '2.4.2'; // v2.4.2: converter picks the right mode — Fast Fix only copies the video stream, so an .mp4 carrying HEVC inside would "convert" and still not play; the converter now probes the video codec first and switches to Full Convert automatically (?v=45)
+const APP_VERSION = '2.4.3'; // v2.4.3: undecodable-video detection — HEVC/DivX video with playable audio fires no error and plays sound over a black screen; the app now says so at loadedmetadata and offers the converter; a fatal HLS error gets a banner; a local .m3u8 playlist gets a plain message instead of a dead player (its segments can't resolve from a blob URL) (?v=46)
 // ICE servers: Google + Cloudflare STUN for direct links, PeerJS's own
 // TURN (its built-in default, which a custom config otherwise discards)
 // as the relay fallback. Open Relay was dropped 22 Nov 2026: its TLS
@@ -3205,7 +3205,31 @@ function mediaErrorMessage(code, isLocalFile) {
   if (code === 4) return isLocalFile ? 'This video format cannot play in the browser (e.g. MKV, AVI or HEVC). Convert it to MP4 (H.264/AAC) or WebM.' : null;
   if (code === 3) return 'Video decoding failed — the file may be corrupted or use an unsupported codec.';
   if (code === 2) return 'Network error while loading the video.';
+  // 'novideo' — no error event fired, but the picture never decoded:
+  // the video track is HEVC/DivX/Theora while the audio plays on.
+  // A black screen with sound and no message is the worst outcome, so
+  // say so plainly and offer the converter for a local file.
+  if (code === 'novideo') return 'The video picture in this file can\'t be decoded (e.g. HEVC or DivX video) — the sound plays but the screen stays black. Convert it to MP4 (H.264/AAC) or WebM.';
+  // 'hls-local' — a playlist picked as a single local file: its segment
+  // links are relative to the playlist, and a blob URL has no folder to
+  // resolve them against, so hls.js can never fetch the pieces — and no
+  // converter can fix it either, because the pieces are not on this
+  // device. Say so instead of a dead player.
+  if (code === 'hls-local') return 'This is an HLS playlist — it only lists the video pieces and needs those piece files beside it. Pick the video file itself (.mp4, .mkv or .ts) instead.';
   return null;
+}
+
+// Pure: is the video picture missing — a file whose container the app
+// knows, whose duration is real, but whose video track never decoded
+// (videoWidth stays 0)? The element fires no error for this: HEVC or
+// DivX video with playable audio just plays sound over a black screen.
+// A genuinely audio-only file has no video extension, so it never
+// triggers; a corrupt file has no duration, so it never triggers either.
+function videoPictureMissing(videoWidth, videoHeight, duration, ext) {
+  const videoExts = ['mp4', 'mkv', 'mov', 'avi', 'wmv', 'flv', 'ts', 'm2ts', 'mts', 'm3u8', '3gp', 'ogv', 'ogx', 'webm', 'vob', 'mpg', 'mpeg'];
+  if (!videoExts.includes((ext || '').toLowerCase())) return false;
+  if ((Number(videoWidth) || 0) > 0 || (Number(videoHeight) || 0) > 0) return false;
+  return Number(duration) > 0;
 }
 
 // Pure: what should happen when the HTML5 player errors?
@@ -3340,11 +3364,34 @@ function mountHtml5Video(srcUrl, titleLabel, onErrorOverride, hintFileName = '')
     player.attachMediaElement(dom.html5VideoPlayer);
     player.load();
   } else if (engine === 'hls' && window.Hls && window.Hls.isSupported()) {
-    try { dom.html5VideoPlayer.removeAttribute('src'); } catch (_) {}
-    const hls = new window.Hls();
-    state.hlsPlayer = hls;
-    hls.loadSource(srcUrl);
-    hls.attachMedia(dom.html5VideoPlayer);
+    if (state.localRawFile) {
+      // A playlist picked as a single file has no segments beside it:
+      // its segment links are relative to the playlist, and a blob URL
+      // has no folder to resolve them against — hls.js would fail, and
+      // no converter can fix it either, because the pieces are not on
+      // this device. Say so instead of a dead player.
+      showMediaError(mediaErrorMessage('hls-local'));
+      showToast(mediaErrorMessage('hls-local'), 'rose');
+      // No convert buttons here: the converter cannot fix a playlist
+      // either — the video pieces are not on this device.
+      if (dom.mediaErrorConvertActions) dom.mediaErrorConvertActions.classList.add('hidden');
+    } else {
+      try { dom.html5VideoPlayer.removeAttribute('src'); } catch (_) {}
+      const hls = new window.Hls();
+      state.hlsPlayer = hls;
+      hls.loadSource(srcUrl);
+      hls.attachMedia(dom.html5VideoPlayer);
+      // A dead playlist used to leave a black player with no message at
+      // all — a fatal HLS error gets the same plain banner as a dead link.
+      hls.on(window.Hls.Events.ERROR, (event, data) => {
+        if (data && data.fatal) {
+          const msg = state.localRawFile
+            ? 'This file uses a codec your browser cannot play (e.g. HEVC video or AC3/DTS audio). Fast Fix converts it in the browser.'
+            : 'This stream did not play — the link may be dead or the format unsupported.';
+          showMediaError(msg);
+        }
+      });
+    }
   } else {
     if (dom.html5VideoPlayer.src !== srcUrl) {
       dom.html5VideoPlayer.src = srcUrl;
@@ -3711,6 +3758,23 @@ dom.html5VideoPlayer.addEventListener('pause', () => {
 dom.html5VideoPlayer.addEventListener('loadedmetadata', () => {
   updateTimelineUI();
   maybeResumeSavedPlayback();
+  // Undecodable-video check: HEVC/DivX/Theora video with playable audio
+  // fires NO error — the file just plays sound over a black screen.
+  // If the picture never decoded on a native mount, say so and offer the
+  // converter instead of leaving a black screen. Skipped for shared
+  // streams (srcObject has no dimensions until the first frame) and for
+  // mpegts/hls mounts, which have their own error paths.
+  if (!state.receivingMovie && !dom.html5VideoPlayer.srcObject) {
+    const v = dom.html5VideoPlayer;
+    const picExt = detectVideoExtension(state.localRawFile ? state.localRawFile.name : (v.currentSrc || ''));
+    if (playbackEngineForExtension(picExt) === 'native' && videoPictureMissing(v.videoWidth, v.videoHeight, getPlayerDuration(), picExt)) {
+      const msg = mediaErrorMessage('novideo', state.mediaType === 'local');
+      if (msg) {
+        showMediaError(msg);
+        showToast(msg, 'rose');
+      }
+    }
+  }
   // The file's duration is known now — refresh the partner's timeline.
   if (state.movieSharing) {
     sendPeerMessage({ kind: 'movie-share-start', from: state.userId, fromName: state.userName, at: Date.now(), fileName: state.localFileName || '', title: state.mediaTitle || '', duration: getPlayerDuration() });
