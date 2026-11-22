@@ -929,7 +929,7 @@
 // =========================================================================
 
 const PEERJS_HOST_PREFIX = 'c2t-';
-const APP_VERSION = '2.2.2'; // v2.2.2: camera switch (front/back) + auto-rejoin on refresh (?v=27) — same Piped redirect + Stitch reskin
+const APP_VERSION = '2.2.3'; // v2.2.3: camera-switch button no longer hidden on phones that list 1 camera (?v=28) — touch devices always get it, facingMode does the switching
 // ICE servers: Google + Cloudflare STUN for direct links, PeerJS's own
 // TURN (its built-in default, which a custom config otherwise discards)
 // as the relay fallback. Open Relay was dropped 22 Nov 2026: its TLS
@@ -2019,10 +2019,17 @@ function toggleFacingMode(mode) {
   return mode === 'environment' ? 'user' : 'environment';
 }
 
-// Show the switch buttons only when this device actually has 2+ cameras
-// (a desktop with one webcam must never see a dead control).
+// Show the switch buttons when switching can work. The old rule (2+
+// cameras listed) hid the button on Android phones: enumerateDevices()
+// often reports a single video input even when the phone has front + back
+// cameras, and the facingMode toggle is what switches those. So a touch
+// device always gets the button; a desktop keeps the 2+ gate so a
+// single-webcam machine never sees a dead control.
 function updateSwitchCamButtons() {
-  const show = state.videoDeviceIds.length >= 2;
+  const nav = (typeof navigator !== 'undefined') ? navigator : {};
+  const canDoCamera = !!(nav.mediaDevices && nav.mediaDevices.getUserMedia);
+  const isTouch = (typeof nav.maxTouchPoints === 'number' && nav.maxTouchPoints > 0);
+  const show = canDoCamera && (state.videoDeviceIds.length >= 2 || isTouch);
   if (dom.loungeSwitchCamBtn) dom.loungeSwitchCamBtn.classList.toggle('hidden', !show);
   if (dom.pipSwitchCamBtn) dom.pipSwitchCamBtn.classList.toggle('hidden', !show);
 }
@@ -2042,6 +2049,7 @@ async function refreshVideoDevices() {
   } catch (_) {
     state.videoDeviceIds = [];
   }
+  debugLog('cameras listed: ' + state.videoDeviceIds.length);
   updateSwitchCamButtons();
 }
 
@@ -2139,7 +2147,7 @@ async function switchCamera() {
     debugLog('camera switched');
   } catch (e) {
     console.error('Camera switch error:', e);
-    showToast('Could not switch camera — keeping the current one.', 'rose');
+    showToast('Could not switch camera' + (e && e.name ? ' (' + e.name + ')' : '') + ' — keeping the current one.', 'rose');
   } finally {
     state.switchingCamera = false;
   }
