@@ -929,7 +929,7 @@
 // =========================================================================
 
 const PEERJS_HOST_PREFIX = 'c2t-';
-const APP_VERSION = '2.2.4'; // v2.2.4: camera switch stops the old track FIRST — Android refuses the second camera while the first is live (NotReadableError, ?v=29)
+const APP_VERSION = '2.2.5'; // v2.2.5: restored + partner YouTube media go through Piped too — the embed path was leaking ads back after every refresh (?v=30)
 // ICE servers: Google + Cloudflare STUN for direct links, PeerJS's own
 // TURN (its built-in default, which a custom config otherwise discards)
 // as the relay fallback. Open Relay was dropped 22 Nov 2026: its TLS
@@ -1288,6 +1288,52 @@ async function resolveYouTubeViaPiped(videoId) {
   return null;
 }
 
+// Pure: how should a saved/incoming media line be mounted?
+// A YouTube id — or a Piped stream line that remembers its YouTube id —
+// goes through the ad-free Piped resolver; a plain direct link mounts
+// as-is; anything else mounts nothing.
+function mountPlanForMedia(media) {
+  if (!media || !media.url) return { via: 'none' };
+  if (media.type === 'youtube') return { via: 'piped', videoId: media.url };
+  if (media.type === 'url' && media.videoId) return { via: 'piped', videoId: media.videoId };
+  if (media.type === 'url') return { via: 'direct' };
+  return { via: 'none' };
+}
+
+// Mount a YouTube video ad-free when possible: resolve the direct stream
+// through Piped and play it in the app's own player; fall back to the
+// YouTube embed (with its ads) only when Piped cannot serve this video.
+// Returns true when the ad-free stream is playing, false on fallback.
+async function mountYouTubeAdFree(videoId, titleLabel) {
+  dom.nowPlayingBanner.classList.remove('hidden');
+  dom.nowPlayingTitle.textContent = 'Finding an ad-free stream…';
+  try {
+    const piped = await resolveYouTubeViaPiped(videoId);
+    if (piped) {
+      const title = piped.title || titleLabel || `YouTube (${videoId})`;
+      mountHtml5Video(piped.streamUrl, title, () => {
+        dom.nowPlayingBanner.classList.remove('hidden');
+        dom.nowPlayingTitle.textContent = 'The ad-free stream stopped — paste the YouTube link again to retry.';
+      });
+      const playable = await waitForPlayable(dom.html5VideoPlayer, 10000);
+      if (playable) {
+        state.mediaType = 'url';
+        state.mediaUrl = piped.streamUrl;
+        state.mediaTitle = title;
+        dom.ratingMovieTitleInput.value = title;
+        return true;
+      }
+    }
+  } catch (_) { /* fall through to the embed */ }
+  state.mediaType = 'youtube';
+  state.mediaUrl = videoId;
+  state.mediaTitle = titleLabel || `YouTube (${videoId})`;
+  dom.nowPlayingBanner.classList.remove('hidden');
+  dom.nowPlayingTitle.textContent = 'Loading YouTube video...';
+  mountYouTubePlayer(videoId);
+  return false;
+}
+
 function waitForPlayable(videoEl, timeoutMs) {
   if (videoEl.readyState >= 3) return Promise.resolve(true);
   return new Promise((resolve) => {
@@ -1431,7 +1477,7 @@ function mergeLogLines(lines) {
 function replayLog() {
   const prev = state.roomData || {};
   const next = {
-    media: prev.media || { type: 'none', url: '', title: '', localFileName: '', updatedBy: '', updatedByName: '', updatedAt: 0 },
+    media: prev.media || { type: 'none', url: '', title: '', localFileName: '', videoId: '', updatedBy: '', updatedByName: '', updatedAt: 0 },
     playback: prev.playback || { isPlaying: false, currentTime: 0, updatedAt: 0, updatedBy: '', updatedByName: '', actionLabel: 'opened room', seq: 0 },
     participants: prev.participants || {},
     readyCheck: prev.readyCheck || { active: false, startedBy: '', readyUsers: {}, countdownStartAt: null },
@@ -1449,6 +1495,7 @@ function replayLog() {
         url: d.url || '',
         title: d.title || '',
         localFileName: d.localFileName || '',
+        videoId: d.videoId || '',
         updatedBy: line.by || '',
         updatedByName: line.byName || '',
         updatedAt: line.at
@@ -1517,15 +1564,29 @@ function applySavedMedia() {
   if (state.lastMountedMediaKey === mediaKey) return;
   state.lastMountedMediaKey = mediaKey;
   if (media.type === 'youtube' && media.url) {
+    // A restored YouTube video goes through the ad-free resolver too —
+    // the old code mounted the plain embed here, so every refresh
+    // brought the ads back.
     state.mediaType = 'youtube';
     state.mediaUrl = media.url;
     dom.nowPlayingBanner.classList.remove('hidden');
     dom.nowPlayingTitle.textContent = media.title || 'YouTube Feature';
-    mountYouTubePlayer(media.url);
+    mountYouTubeAdFree(media.url, media.title || 'YouTube Feature');
   } else if (media.type === 'url' && media.url) {
-    state.mediaType = 'url';
-    state.mediaUrl = media.url;
-    mountHtml5Video(media.url, media.title || 'Shared Video Stream');
+    const plan = mountPlanForMedia(media);
+    if (plan.via === 'piped') {
+      // A saved Piped stream URL goes stale — resolve a fresh one from
+      // the remembered YouTube id instead of mounting a dead link.
+      state.mediaType = 'youtube';
+      state.mediaUrl = plan.videoId;
+      dom.nowPlayingBanner.classList.remove('hidden');
+      dom.nowPlayingTitle.textContent = media.title || 'YouTube Feature';
+      mountYouTubeAdFree(plan.videoId, media.title || 'YouTube Feature');
+    } else {
+      state.mediaType = 'url';
+      state.mediaUrl = media.url;
+      mountHtml5Video(media.url, media.title || 'Shared Video Stream');
+    }
   } else if (media.type === 'local') {
     state.mediaType = 'local';
     dom.localFileSelectedBadge.classList.remove('hidden');
@@ -2756,31 +2817,15 @@ function mountHtml5Video(srcUrl, titleLabel, onErrorOverride) {
 // If the instance is down or the stream will not play, use the YouTube
 // embed exactly as before — never a dead screen.
 async function loadYouTubeVideo(ytId, titleLabel) {
-  dom.nowPlayingBanner.classList.remove('hidden');
-  dom.nowPlayingTitle.textContent = 'Finding an ad-free stream…';
-  const piped = await resolveYouTubeViaPiped(ytId);
-  if (piped) {
-    const title = piped.title || titleLabel || `YouTube (${ytId})`;
-    state.mediaType = 'url';
-    state.mediaUrl = piped.streamUrl;
-    state.mediaTitle = title;
-    mountHtml5Video(piped.streamUrl, title, () => {
-      dom.nowPlayingBanner.classList.remove('hidden');
-      dom.nowPlayingTitle.textContent = 'The ad-free stream stopped — paste the YouTube link again to retry.';
-    });
-    const playable = await waitForPlayable(dom.html5VideoPlayer, 10000);
-    if (playable) {
-      syncMediaToRoom('url', piped.streamUrl, title);
-      showToast('Playing ad-free for both of you 🎬', 'emerald');
-      return;
-    }
+  const adFree = await mountYouTubeAdFree(ytId, titleLabel);
+  if (adFree) {
+    // Remember the YouTube id on the line: on a later refresh the saved
+    // stream URL may be stale, and the id lets this device resolve a
+    // fresh ad-free stream instead of mounting a dead link.
+    syncMediaToRoom('url', state.mediaUrl, state.mediaTitle, '', ytId);
+    showToast('Playing ad-free for both of you 🎬', 'emerald');
+    return;
   }
-  state.mediaType = 'youtube';
-  state.mediaUrl = ytId;
-  state.mediaTitle = `YouTube (${ytId})`;
-  dom.nowPlayingBanner.classList.remove('hidden');
-  dom.nowPlayingTitle.textContent = 'Loading YouTube video...';
-  mountYouTubePlayer(ytId);
   syncMediaToRoom('youtube', ytId, titleLabel || 'YouTube Feature');
   showToast('YouTube video synced to room 🎬', 'emerald');
 }
@@ -3038,33 +3083,45 @@ function handleIncomingMediaUpdate(media, prevMedia) {
     return;
   }
 
-  // Remote URL or YouTube link loaded
+  // Remote URL or YouTube link loaded — a YouTube video goes through the
+  // ad-free resolver, not the plain embed, or the ads come back on this
+  // side even when the partner's side is ad-free.
   if (media.type === 'youtube' && media.url) {
     state.mediaType = 'youtube';
     state.mediaUrl = media.url;
     dom.nowPlayingBanner.classList.remove('hidden');
     dom.nowPlayingTitle.textContent = media.title || 'YouTube Feature';
-    mountYouTubePlayer(media.url);
+    mountYouTubeAdFree(media.url, media.title || 'YouTube Feature');
     if (media.updatedBy !== state.userId) {
       showToast(`${media.updatedByName} loaded a YouTube video 🎬`, 'gold');
     }
   } else if (media.type === 'url' && media.url) {
-    state.mediaType = 'url';
-    state.mediaUrl = media.url;
-    mountHtml5Video(media.url, media.title || 'Shared Video Stream');
+    const plan = mountPlanForMedia(media);
+    if (plan.via === 'piped') {
+      state.mediaType = 'youtube';
+      state.mediaUrl = plan.videoId;
+      dom.nowPlayingBanner.classList.remove('hidden');
+      dom.nowPlayingTitle.textContent = media.title || 'YouTube Feature';
+      mountYouTubeAdFree(plan.videoId, media.title || 'YouTube Feature');
+    } else {
+      state.mediaType = 'url';
+      state.mediaUrl = media.url;
+      mountHtml5Video(media.url, media.title || 'Shared Video Stream');
+    }
     if (media.updatedBy !== state.userId) {
       showToast(`${media.updatedByName} loaded "${media.title || 'a video'}" 🎬`, 'gold');
     }
   }
 }
 
-function syncMediaToRoom(type, url, title, localFileName = '') {
+function syncMediaToRoom(type, url, title, localFileName = '', videoId = '') {
   if (!state.roomCode) return;
   const line = appendLog('media', {
     type,
     url,
     title,
     localFileName,
+    ...(videoId ? { videoId } : {}),
     actionLabel: 'loaded new video'
   });
   replayLog();
