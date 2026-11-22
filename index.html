@@ -929,7 +929,7 @@
 // =========================================================================
 
 const PEERJS_HOST_PREFIX = 'c2t-';
-const APP_VERSION = '2.2.3'; // v2.2.3: camera-switch button no longer hidden on phones that list 1 camera (?v=28) — touch devices always get it, facingMode does the switching
+const APP_VERSION = '2.2.4'; // v2.2.4: camera switch stops the old track FIRST — Android refuses the second camera while the first is live (NotReadableError, ?v=29)
 // ICE servers: Google + Cloudflare STUN for direct links, PeerJS's own
 // TURN (its built-in default, which a custom config otherwise discards)
 // as the relay fallback. Open Relay was dropped 22 Nov 2026: its TLS
@@ -2088,7 +2088,23 @@ async function switchCamera() {
     ? { ...size, deviceId: { exact: targetDeviceId } }
     : { ...size, facingMode: targetFacing };
 
+  // Android cannot open the second camera while the first track is live
+  // (NotReadableError) — stop the old track FIRST, then open the new one.
+  // If the new camera fails, the catch below re-opens the old one.
+  const oldTrack = state.localStream.getVideoTracks()[0] || null;
+  const oldFacing = state.currentFacingMode || 'user';
+  const oldDeviceId = state.currentVideoDeviceId || null;
+  const oldConstraints = oldDeviceId
+    ? { ...size, deviceId: { exact: oldDeviceId } }
+    : { ...size, facingMode: oldFacing };
+  if (oldTrack) {
+    try { state.localStream.removeTrack(oldTrack); } catch (_) {}
+    try { oldTrack.stop(); } catch (_) {}
+  }
+  // Let the OS release the camera before opening the next one.
+  await new Promise((r) => setTimeout(r, 150));
   state.switchingCamera = true;
+  let newTrack = null;
   try {
     let newStream = null;
     try {
@@ -2103,35 +2119,16 @@ async function switchCamera() {
         throw e;
       }
     }
-    const newTrack = newStream.getVideoTracks()[0];
+    newTrack = newStream.getVideoTracks()[0];
     if (!newTrack) {
       newStream.getTracks().forEach((t) => t.stop());
       throw new Error('no video track');
     }
-    const oldTrack = state.localStream.getVideoTracks()[0] || null;
-    // Add the new track first, swap the live sender, then stop the old one.
     state.localStream.addTrack(newTrack);
     newTrack.enabled = state.camOn;
-    let senderOk = true;
     if (state.mediaConn && state.mediaConn.peerConnection) {
-      try {
-        const sender = state.mediaConn.peerConnection.getSenders().find((s) => s.track && s.track.kind === 'video');
-        if (sender) await sender.replaceTrack(newTrack);
-      } catch (e) {
-        console.error('replaceTrack failed:', e);
-        senderOk = false;
-      }
-    }
-    if (!senderOk) {
-      // Roll back: the partner keeps the old track, the new one is dropped.
-      try { state.localStream.removeTrack(newTrack); } catch (_) {}
-      try { newTrack.stop(); } catch (_) {}
-      showToast('Could not switch the camera for your partner — keeping the current one.', 'rose');
-      return;
-    }
-    if (oldTrack) {
-      try { state.localStream.removeTrack(oldTrack); } catch (_) {}
-      try { oldTrack.stop(); } catch (_) {}
+      const sender = state.mediaConn.peerConnection.getSenders().find((s) => s.track && s.track.kind === 'video');
+      if (sender) await sender.replaceTrack(newTrack);
     }
     // Re-attach previews (same stream object; re-assigning fixes browsers
     // that drop the frame on a track swap).
@@ -2147,7 +2144,33 @@ async function switchCamera() {
     debugLog('camera switched');
   } catch (e) {
     console.error('Camera switch error:', e);
-    showToast('Could not switch camera' + (e && e.name ? ' (' + e.name + ')' : '') + ' — keeping the current one.', 'rose');
+    // The new camera failed — re-open the old one so the user is not
+    // left with no video at all.
+    let restored = false;
+    try {
+      const backStream = await navigator.mediaDevices.getUserMedia({ video: oldConstraints });
+      const backTrack = backStream.getVideoTracks()[0];
+      if (backTrack) {
+        if (newTrack) {
+          try { state.localStream.removeTrack(newTrack); } catch (_) {}
+          try { newTrack.stop(); } catch (_) {}
+        }
+        state.localStream.addTrack(backTrack);
+        backTrack.enabled = state.camOn;
+        if (state.mediaConn && state.mediaConn.peerConnection) {
+          try {
+            const sender = state.mediaConn.peerConnection.getSenders().find((s) => s.track && s.track.kind === 'video');
+            if (sender) await sender.replaceTrack(backTrack);
+          } catch (_) {}
+        }
+        if (dom.loungeLocalVideo) dom.loungeLocalVideo.srcObject = state.localStream;
+        if (dom.pipLocalVideo) dom.pipLocalVideo.srcObject = state.localStream;
+        restored = true;
+      }
+    } catch (_) { /* restore failed too — camera stays off */ }
+    showToast(restored
+      ? 'Could not switch camera' + (e && e.name ? ' (' + e.name + ')' : '') + ' — back on the current one.'
+      : 'Could not switch camera' + (e && e.name ? ' (' + e.name + ')' : '') + ' — camera is off now, tap Cam to try again.', 'rose');
   } finally {
     state.switchingCamera = false;
   }
