@@ -507,7 +507,7 @@
                   <span>This page is taking a while — the site may not allow opening inside the app. Try opening it in your browser.</span>
                   <button id="webBlockedDismissBtn" type="button" class="text-error font-bold px-1.5 cursor-pointer shrink-0">✕</button>
                 </div>
-                <iframe id="webBrowserFrame" title="Shared web page" class="flex-1 w-full border-0 bg-white" sandbox="allow-scripts allow-forms allow-popups" referrerpolicy="no-referrer"></iframe>
+                <iframe id="webBrowserFrame" title="Shared web page" class="flex-1 w-full border-0 bg-white" sandbox="allow-scripts allow-forms" referrerpolicy="no-referrer"></iframe>
               </div>
 
               <div id="floatingReactionsLayer" class="absolute inset-0 pointer-events-none overflow-hidden z-30"></div>
@@ -1027,7 +1027,7 @@
 // =========================================================================
 
 const PEERJS_HOST_PREFIX = 'c2t-';
-const APP_VERSION = '2.5.2'; // v2.4.3: undecodable-video detection — HEVC/DivX video with playable audio fires no error and plays sound over a black screen; the app now says so at loadedmetadata and offers the converter; a fatal HLS error gets a banner; a local .m3u8 playlist gets a plain message instead of a dead player (its segments can't resolve from a blob URL) (?v=46)
+const APP_VERSION = '2.5.3'; // v2.4.3: undecodable-video detection — HEVC/DivX video with playable audio fires no error and plays sound over a black screen; the app now says so at loadedmetadata and offers the converter; a fatal HLS error gets a banner; a local .m3u8 playlist gets a plain message instead of a dead player (its segments can't resolve from a blob URL) (?v=46)
 // ICE servers: Google + Cloudflare STUN for direct links, PeerJS's own
 // TURN (its built-in default, which a custom config otherwise discards)
 // as the relay fallback. Open Relay was dropped 22 Nov 2026: its TLS
@@ -1484,8 +1484,8 @@ function normalizeWebUrl(raw) {
 // parent app. Unparseable URLs, opaque origins and a missing app origin
 // stay strict — the mount rejects those URLs anyway. Never
 // allow-top-navigation: the framed page must not navigate the app away.
-const WEBLINK_SANDBOX_STRICT = 'allow-scripts allow-forms allow-popups';
-const WEBLINK_SANDBOX_CROSS_ORIGIN = 'allow-scripts allow-forms allow-popups allow-same-origin';
+const WEBLINK_SANDBOX_STRICT = 'allow-scripts allow-forms';
+const WEBLINK_SANDBOX_CROSS_ORIGIN = 'allow-scripts allow-forms allow-same-origin';
 function sandboxTokensForWeblink(url, appOrigin) {
   try {
     const pageOrigin = new URL(url).origin;
