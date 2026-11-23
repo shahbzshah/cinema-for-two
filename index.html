@@ -1027,7 +1027,7 @@
 // =========================================================================
 
 const PEERJS_HOST_PREFIX = 'c2t-';
-const APP_VERSION = '2.5.1'; // v2.4.3: undecodable-video detection — HEVC/DivX video with playable audio fires no error and plays sound over a black screen; the app now says so at loadedmetadata and offers the converter; a fatal HLS error gets a banner; a local .m3u8 playlist gets a plain message instead of a dead player (its segments can't resolve from a blob URL) (?v=46)
+const APP_VERSION = '2.5.2'; // v2.4.3: undecodable-video detection — HEVC/DivX video with playable audio fires no error and plays sound over a black screen; the app now says so at loadedmetadata and offers the converter; a fatal HLS error gets a banner; a local .m3u8 playlist gets a plain message instead of a dead player (its segments can't resolve from a blob URL) (?v=46)
 // ICE servers: Google + Cloudflare STUN for direct links, PeerJS's own
 // TURN (its built-in default, which a custom config otherwise discards)
 // as the relay fallback. Open Relay was dropped 22 Nov 2026: its TLS
@@ -1474,6 +1474,27 @@ function normalizeWebUrl(raw) {
   if (/^[a-z][a-z0-9+.-]*:/i.test(trimmed)) return '';
   if (!/^[^\s]+\.[^\s]{2,}(\/\S*)?$/.test(trimmed)) return '';
   return 'https://' + trimmed;
+}
+
+// Pure: sandbox tokens for the shared mini-browser iframe. A cross-origin
+// page needs allow-same-origin — without it, its own storage reads
+// (sessionStorage/localStorage) throw SecurityError and the page dies on
+// load (ThugTv, ?v=54). A same-origin page keeps the strict set: with
+// allow-same-origin a framed page on our own origin could script the
+// parent app. Unparseable URLs, opaque origins and a missing app origin
+// stay strict — the mount rejects those URLs anyway. Never
+// allow-top-navigation: the framed page must not navigate the app away.
+const WEBLINK_SANDBOX_STRICT = 'allow-scripts allow-forms allow-popups';
+const WEBLINK_SANDBOX_CROSS_ORIGIN = 'allow-scripts allow-forms allow-popups allow-same-origin';
+function sandboxTokensForWeblink(url, appOrigin) {
+  try {
+    const pageOrigin = new URL(url).origin;
+    const app = new URL(appOrigin || '');
+    if (pageOrigin !== 'null' && pageOrigin !== app.origin) return WEBLINK_SANDBOX_CROSS_ORIGIN;
+  } catch (_) {
+    // Unparseable URL or origin — stay strict.
+  }
+  return WEBLINK_SANDBOX_STRICT;
 }
 
 // Pure: a short title for a shared link — its host (example.com).
@@ -4344,6 +4365,11 @@ function mountWeblink(url, force = false, at = 0) {
       dom.webBlockedBanner.classList.remove('hidden');
     }
   }, 10000);
+  // The sandbox decides whether the framed page may touch its own
+  // storage. Set it BEFORE any src assignment below — changing it after
+  // the page loads would reload the frame. The force/reload path reuses
+  // the sandbox set here; it never re-assigns it.
+  dom.webBrowserFrame.setAttribute('sandbox', sandboxTokensForWeblink(clean, window.location.origin));
   const currentSrc = webFrameCurrentSrc();
   const samePage = currentSrc === clean || currentSrc === clean + '/';
   if (force && samePage) {
