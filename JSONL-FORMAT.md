@@ -34,6 +34,7 @@ IS the backup and the carrier.
 | `rating-clear` | `{}` | Clears the rating session (written when a passport stamp spends it). |
 | `passport` | `{ entry: { id, movieTitle, coupleAverage, ratings, vibes, watchedDate, createdAt } }` | Accumulates, newest first. |
 | `passport-delete` | `{ entryId }` | Tombstone — the matching `passport` entry is hidden on replay. The entry line stays in the log. |
+| `weblink` | `{ url, title, sharedByName }` | Accumulates; the shelf dedupes by URL (newest first) and the newest link newer than the current video owns the mini-browser. Both sides mount the same URL in the in-app iframe; each phone scrolls and taps locally — no cross-origin scroll/click sync (the browser forbids reading inside another site's page). |
 
 NOT logged (live-only, over PeerJS): reactions, presence, ready-check.
 
@@ -43,6 +44,7 @@ NOT logged (live-only, over PeerJS): reactions, presence, ready-check.
 {"id":"m1a2b3c4d5e6","v":1,"type":"media","room":"ABC123","at":1763740000000,"by":"c2t-user-a1b2c3d4","byName":"Alex","data":{"type":"youtube","url":"dQw4w9WgXcQ","title":"YouTube Feature","localFileName":""}}
 {"id":"p7q8r9s0t1u2","v":1,"type":"playback","room":"ABC123","at":1763740065000,"by":"c2t-user-a1b2c3d4","byName":"Alex","data":{"isPlaying":false,"currentTime":382.5,"actionLabel":"paused","seq":4}}
 {"id":"w3x4y5z6a7b8","v":1,"type":"whisper","room":"ABC123","at":1763740080000,"by":"c2t-user-e5f6g7h8","byName":"Sam","data":{"text":"Wait rewind that!","movieTimestamp":"06:22","senderName":"Sam"}}
+{"id":"l9m8n7b6v5c4","v":1,"type":"weblink","room":"ABC123","at":1763740100000,"by":"c2t-user-a1b2c3d4","byName":"Alex","data":{"url":"https://example.com/article","title":"Web — example.com","sharedByName":"Alex"}}
 ```
 
 ## Rules

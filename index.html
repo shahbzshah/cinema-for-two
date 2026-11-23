@@ -425,7 +425,7 @@
                 </div>
                 <h2 class="font-headline-md text-headline-md text-text-primary">Your Private Screen Awaits</h2>
                 <p class="font-body-sm text-body-sm text-text-secondary max-w-md mt-1.5">
-                  Pick a source in the Pre-Show Lounge — a YouTube or video URL, a local movie file on both devices, or a Sample Clip — to start watching together.
+                  Pick a source in the Pre-Show Lounge — a YouTube or video URL, a local movie file on both devices, a Sample Clip, or a web page — to start watching together.
                 </p>
               </div>
 
@@ -492,6 +492,24 @@
                 <div id="youtubePlayerMount" class="w-full h-full"></div>
               </div>
 
+              <!-- Shared mini-browser: both sides open the same web page.
+                   Each phone scrolls and taps on its own screen; a new
+                   shared link moves the room together. Some sites refuse
+                   to open inside an app (X-Frame-Options / CSP) — those
+                   get the blocked banner + Open in browser. -->
+              <div id="webBrowserWrapper" class="hidden absolute inset-0 z-20 flex flex-col bg-canvas-background">
+                <div class="flex items-center gap-2 px-3 py-2 border-b border-hairline-border bg-surface-card shrink-0">
+                  <span id="webAddressText" class="flex-1 min-w-0 truncate font-code-timecode text-[11px] text-text-secondary"></span>
+                  <button id="webSyncPageBtn" type="button" class="px-2.5 py-1.5 rounded-[6px] bg-surface-control hover:bg-surface-variant border border-hairline-border text-text-primary text-[11px] font-semibold transition cursor-pointer shrink-0">Sync page</button>
+                  <a id="webOpenExternalBtn" href="#" target="_blank" rel="noopener" class="px-2.5 py-1.5 rounded-[6px] bg-primary-container hover:bg-primary text-canvas-background text-[11px] font-semibold transition cursor-pointer shrink-0">Open in browser</a>
+                </div>
+                <div id="webBlockedBanner" class="hidden px-4 py-2.5 bg-error-container/30 border-b border-error/20 text-[11px] text-text-primary flex items-center justify-between gap-3 shrink-0">
+                  <span>This page is taking a while — the site may not allow opening inside the app. Try opening it in your browser.</span>
+                  <button id="webBlockedDismissBtn" type="button" class="text-error font-bold px-1.5 cursor-pointer shrink-0">✕</button>
+                </div>
+                <iframe id="webBrowserFrame" title="Shared web page" class="flex-1 w-full border-0 bg-white" sandbox="allow-scripts allow-forms allow-popups" referrerpolicy="no-referrer"></iframe>
+              </div>
+
               <div id="floatingReactionsLayer" class="absolute inset-0 pointer-events-none overflow-hidden z-30"></div>
 
               <!-- 3-2-1 Ready Check overlay -->
@@ -525,7 +543,7 @@
           </div>
 
           <!-- Transport bar -->
-          <div class="bg-surface-card rounded-[10px] border border-hairline-border px-4 py-3 flex flex-col gap-2.5">
+          <div id="transportBar" class="bg-surface-card rounded-[10px] border border-hairline-border px-4 py-3 flex flex-col gap-2.5">
             <div class="flex items-center gap-3">
               <span id="currentTimeLabel" class="font-code-timecode text-code-timecode text-primary select-none whitespace-nowrap tabular-nums w-12 text-right">00:00</span>
               <input
@@ -776,6 +794,9 @@
           <button type="button" data-source-tab="samples" class="source-tab-btn flex-1 sm:flex-initial px-3 py-2 rounded-[6px] text-xs font-semibold transition text-text-secondary hover:text-text-primary cursor-pointer flex items-center justify-center gap-1.5">
             <span class="material-symbols-outlined text-[14px]">&#xE1C4;</span>Sample Clips
           </button>
+          <button type="button" data-source-tab="web" class="source-tab-btn flex-1 sm:flex-initial px-3 py-2 rounded-[6px] text-xs font-semibold transition text-text-secondary hover:text-text-primary cursor-pointer flex items-center justify-center gap-1.5">
+            <span class="material-symbols-outlined text-[14px]">&#xE250;</span>Web
+          </button>
         </div>
 
         <div id="tabPanel-url" class="source-tab-panel">
@@ -805,6 +826,24 @@
           </div>
           <p id="partnerLocalFileHint" class="text-[11px] text-text-muted mt-2 leading-relaxed">Your partner needs the same file on their device — pick it on both sides and playback stays in sync.</p>
           <p class="text-[11px] text-text-muted mt-2 leading-relaxed">Plays MP4, WebM, MKV, TS, FLV and MOV — files with AC3/DTS audio play silent until converted with Fix Audio.</p>
+        </div>
+
+        <div id="tabPanel-web" class="source-tab-panel hidden">
+          <form id="weblinkLoadForm" class="flex gap-2">
+            <input
+              id="weblinkUrlInput"
+              type="text"
+              placeholder="Paste any web page link…"
+              class="flex-1 min-w-0 px-3.5 h-10 rounded-[6px] bg-canvas-background border border-hairline-border text-sm text-text-primary placeholder-text-muted focus:outline-none focus:border-primary-container/60"
+            />
+            <button type="submit" class="h-10 px-4 rounded-[6px] bg-primary-container hover:bg-primary text-canvas-background font-semibold text-sm transition cursor-pointer shrink-0">Share Web Page</button>
+          </form>
+          <p class="text-[11px] text-text-muted mt-2 leading-relaxed">Both of you open the same page in the mini-browser — scroll and tap on your own screen. A new link moves the room together. Some sites refuse to open inside an app — those open in your browser instead.</p>
+          <div class="mt-3">
+            <p class="font-label-sm text-label-sm text-text-muted uppercase tracking-wider mb-1.5">Shared links</p>
+            <p id="weblinkShelfEmpty" class="text-[11px] text-text-muted">No links shared yet — paste one above.</p>
+            <div id="weblinkShelf" class="flex flex-col gap-1.5"></div>
+          </div>
         </div>
 
         <div id="tabPanel-samples" class="source-tab-panel hidden">
@@ -988,7 +1027,7 @@
 // =========================================================================
 
 const PEERJS_HOST_PREFIX = 'c2t-';
-const APP_VERSION = '2.5.0'; // v2.4.3: undecodable-video detection — HEVC/DivX video with playable audio fires no error and plays sound over a black screen; the app now says so at loadedmetadata and offers the converter; a fatal HLS error gets a banner; a local .m3u8 playlist gets a plain message instead of a dead player (its segments can't resolve from a blob URL) (?v=46)
+const APP_VERSION = '2.5.1'; // v2.4.3: undecodable-video detection — HEVC/DivX video with playable audio fires no error and plays sound over a black screen; the app now says so at loadedmetadata and offers the converter; a fatal HLS error gets a banner; a local .m3u8 playlist gets a plain message instead of a dead player (its segments can't resolve from a blob URL) (?v=46)
 // ICE servers: Google + Cloudflare STUN for direct links, PeerJS's own
 // TURN (its built-in default, which a custom config otherwise discards)
 // as the relay fallback. Open Relay was dropped 22 Nov 2026: its TLS
@@ -1059,6 +1098,12 @@ const state = {
   userPlayIntent: false, // set by the play button / countdown / movie-control before a deliberate play, so the pause-echo guard never swallows a real press
   ecWarned: false, // echo-cancellation-off warning shown once per session
   videoWhisperTimer: null, // auto-hide timer for the on-video whisper popup
+  weblinkLoadTimer: null, // blocked-site detection timer for the mini-browser iframe
+  lastMountedWeblinkUrl: '', // URL currently in the mini-browser (mount guard)
+  lastMountedWeblinkAt: 0, // `at` of the mounted weblink line
+  webExpectedUrl: '', // URL the iframe is expected to load (ignores about:blank loads)
+  webFrameSrc: '', // exact string assigned to the iframe src (load handler matches this)
+  webViewerLoaded: false, // the current iframe fired its load event
   // v2 — voice & video calling (WebRTC media over the same PeerJS link)
   localStream: null,
   remoteStream: null,
@@ -1150,6 +1195,18 @@ const dom = {
   copyInviteBtn: document.getElementById('copyInviteBtn'),
   videoUrlInput: document.getElementById('videoUrlInput'),
   urlLoadForm: document.getElementById('urlLoadForm'),
+  weblinkUrlInput: document.getElementById('weblinkUrlInput'),
+  weblinkLoadForm: document.getElementById('weblinkLoadForm'),
+  weblinkShelf: document.getElementById('weblinkShelf'),
+  weblinkShelfEmpty: document.getElementById('weblinkShelfEmpty'),
+  webBrowserWrapper: document.getElementById('webBrowserWrapper'),
+  webBrowserFrame: document.getElementById('webBrowserFrame'),
+  webAddressText: document.getElementById('webAddressText'),
+  webSyncPageBtn: document.getElementById('webSyncPageBtn'),
+  webOpenExternalBtn: document.getElementById('webOpenExternalBtn'),
+  webBlockedBanner: document.getElementById('webBlockedBanner'),
+  webBlockedDismissBtn: document.getElementById('webBlockedDismissBtn'),
+  transportBar: document.getElementById('transportBar'),
   localFileInput: document.getElementById('localFileInput'),
   localFileSelectedBadge: document.getElementById('localFileSelectedBadge'),
   localFileNameDisplay: document.getElementById('localFileNameDisplay'),
@@ -1402,6 +1459,60 @@ function mountPlanForMedia(media) {
   return { via: 'none' };
 }
 
+// Pure: normalise a pasted web address for the shared mini-browser.
+// Adds https:// when no scheme is given; rejects anything that is not a
+// plain http(s) page (javascript:, data:, file: and the like can never
+// load in the iframe and must not reach it). '' means "not a web page".
+function normalizeWebUrl(raw) {
+  const trimmed = String(raw || '').trim();
+  if (!trimmed) return '';
+  if (/^(javascript|data|file|blob|about|chrome|view-source):/i.test(trimmed)) return '';
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed)) {
+    if (!/^https?:\/\//i.test(trimmed)) return '';
+    return trimmed;
+  }
+  if (/^[a-z][a-z0-9+.-]*:/i.test(trimmed)) return '';
+  if (!/^[^\s]+\.[^\s]{2,}(\/\S*)?$/.test(trimmed)) return '';
+  return 'https://' + trimmed;
+}
+
+// Pure: a short title for a shared link — its host (example.com).
+function weblinkTitleForUrl(url) {
+  try {
+    const host = new URL(url).hostname || '';
+    return host ? 'Web — ' + host : 'Shared web page';
+  } catch (_) {
+    return 'Shared web page';
+  }
+}
+
+// Pure: the shared-links shelf — one entry per URL, newest first.
+// Re-sharing the same link does not duplicate the shelf.
+function uniqueWeblinks(weblinks) {
+  const byUrl = new Map();
+  (weblinks || []).forEach((w) => {
+    if (!w || !w.url) return;
+    const prev = byUrl.get(w.url);
+    if (!prev || (w.createdAt || 0) > (prev.createdAt || 0)) byUrl.set(w.url, w);
+  });
+  return [...byUrl.values()].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+}
+
+// Pure: the newest shared link, or null when the room has none.
+function latestWeblink(weblinks) {
+  const list = (weblinks || []).filter((w) => w && w.url);
+  if (!list.length) return null;
+  return list.reduce((a, b) => ((b.createdAt || 0) > (a.createdAt || 0) ? b : a));
+}
+
+// Pure: does this weblink own the stage — i.e. is it newer than the
+// room's current video? A video loaded after the link wins; a link
+// shared after the video takes the stage.
+function isWeblinkNewerThanMedia(weblink, media) {
+  if (!weblink) return false;
+  return (Number(weblink.createdAt) || 0) > (Number(media && media.updatedAt) || 0);
+}
+
 // Mount a YouTube video ad-free when possible: resolve the direct stream
 // through Piped and play it in the app's own player; fall back to the
 // YouTube embed (with its ads) only when Piped cannot serve this video.
@@ -1506,7 +1617,7 @@ function initLocalUserId() {
 // One line = one JSON object:
 // { id, v: 1, type, room, at (epoch ms), by (local user id), byName, data }
 // Types: media | playback | whisper | rating | rating-clear |
-//        passport | passport-delete
+//        passport | passport-delete | weblink
 // Reactions, presence and ready-check are ephemeral: PeerJS only, never logged.
 // =========================================================================
 function logStorageKey(code) {
@@ -1593,7 +1704,8 @@ function replayLog() {
     readyCheck: prev.readyCheck || { active: false, startedBy: '', readyUsers: {}, countdownStartAt: null },
     ratingSession: { movieTitle: '', submissions: {} },
     whispers: [],
-    passport: []
+    passport: [],
+    weblinks: []
   };
   const deletedPassportIds = new Set();
   const lines = state.logLines.slice().sort((a, b) => (a.at || 0) - (b.at || 0));
@@ -1644,6 +1756,20 @@ function replayLog() {
       if (d.entry && d.entry.id) next.passport.push(d.entry);
     } else if (line.type === 'passport-delete') {
       if (d.entryId) deletedPassportIds.add(d.entryId);
+    } else if (line.type === 'weblink') {
+      // Shared web pages accumulate like whispers — the shelf dedupes by
+      // URL and the newest one owns the mini-browser (see
+      // isWeblinkNewerThanMedia).
+      if (d.url) {
+        next.weblinks.push({
+          id: line.id,
+          url: d.url,
+          title: d.title || weblinkTitleForUrl(d.url),
+          sharedBy: line.by || '',
+          sharedByName: d.sharedByName || line.byName || '',
+          createdAt: line.at
+        });
+      }
     }
   });
   if (deletedPassportIds.size) {
@@ -1651,16 +1777,19 @@ function replayLog() {
   }
   next.whispers.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
   next.passport.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  next.weblinks.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
   state.roomData = next;
 }
 
 function renderAllFromLog() {
   renderWhisperMessages(state.roomData.whispers);
   renderPassportTimeline(state.roomData.passport);
+  renderWeblinkShelf(state.roomData.weblinks);
   renderLiveRatingComparison(state.roomData.ratingSession);
   if (state.roomData.media && state.roomData.media.type !== 'none') {
     applySavedMedia();
   }
+  maybeMountSavedWeblink();
   updateTimelineUI();
 }
 
@@ -2193,6 +2322,7 @@ function answerMovieCall(call) {
 // send intents, the sender drives the file, the stream follows.
 function attachMovieStream(stream) {
   destroyCustomDemuxers();
+  hideWebViewer();
   state.mediaType = 'local';
   hideMediaError();
   hideUnmuteOverlay();
@@ -3010,6 +3140,17 @@ function handleIncomingLogLine(line, prevMedia) {
         showToast(`💬 ${name}: ${preview}`, 'rose', () => setWhisperOpen(true), 5000);
       }
     }
+  } else if (line.type === 'weblink') {
+    // A web page just arrived live from the partner. The mount itself
+    // happens in renderAllFromLog (maybeMountSavedWeblink, right after
+    // this) — here we only announce it. Bulk catch-up (log-lines) does
+    // not pass through here, so reconnects do not spam toasts.
+    if (line.by && line.by !== state.userId) {
+      const d = line.data || {};
+      const name = d.sharedByName || line.byName || 'Your partner';
+      showToast(`${name} shared a web page`, 'gold');
+      if (state.inLounge) switchSourceTab('web');
+    }
   }
 }
 
@@ -3190,6 +3331,7 @@ window.onYouTubeIframeAPIReady = function () {
 
 function mountYouTubePlayer(videoId) {
   destroyCustomDemuxers();
+  hideWebViewer();
   if (!/^[a-zA-Z0-9_-]{11}$/.test(videoId || '')) {
     dom.nowPlayingBanner.classList.remove('hidden');
     dom.nowPlayingTitle.textContent = 'That YouTube link did not play — check the full link and try again.';
@@ -3407,6 +3549,7 @@ function destroyCustomDemuxers() {
 
 function mountHtml5Video(srcUrl, titleLabel, onErrorOverride, hintFileName = '') {
   destroyCustomDemuxers();
+  hideWebViewer();
   dom.emptyPlayerPlaceholder.classList.add('hidden');
   hideMediaError();
   hideUnmuteOverlay();
@@ -3956,6 +4099,11 @@ function maybeResumeSavedPlayback() {
     state.skipMetadataResume = false;
     return;
   }
+  // The room is browsing the web, not watching a video — resuming the
+  // saved playback here would start a hidden video playing audio behind
+  // the web page. The weblink owns the stage until a video is loaded.
+  const latestLink = latestWeblink(state.roomData.weblinks);
+  if (isWeblinkNewerThanMedia(latestLink, state.roomData.media)) return;
   if (!playbackIsFreshForMedia(state.roomData.playback, state.roomData.media)) return;
   applyRemotePlaybackState(state.roomData.playback, true);
 }
@@ -4097,6 +4245,7 @@ function handleIncomingMediaUpdate(media, prevMedia) {
       // Same file we were sharing → they have it now, the stream is
       // redundant. Different file → their share is about to start and
       // replaces ours. Either way our share is already stopped above.
+      hideWebViewer();
       dom.partnerLocalFileHint.classList.remove('hidden');
       dom.partnerLocalFileHint.textContent = `Partner selected local file: "${media.localFileName}" — the shared stream should start in a moment; if it doesn't, pick the same file on your device to sync!`;
       showToast(`${media.updatedByName} loaded local file "${media.localFileName}"`, 'gold');
@@ -4135,6 +4284,171 @@ function handleIncomingMediaUpdate(media, prevMedia) {
       showToast(`${media.updatedByName} loaded "${media.title || 'a video'}" 🎬`, 'gold');
     }
   }
+}
+
+// =========================================================================
+// SHARED MINI-BROWSER (v2.5.1): both sides open the same web page in an
+// iframe inside the player stage. Each phone scrolls and taps on its own
+// screen — the browser blocks reading scroll/clicks inside another site's
+// page, so there is no cross-origin scroll or click sync by design. A new
+// shared link moves the room together; that is the sync point.
+// =========================================================================
+// Which side of the stage is showing: the video player or the web page.
+// The transport bar belongs to the video — it hides while browsing.
+function setStageMode(mode) {
+  if (dom.transportBar) dom.transportBar.classList.toggle('hidden', mode === 'web');
+}
+
+// Mount a shared web page in the mini-browser. Pauses any playing video
+// first (silently — the partner mounts the same page on the same line and
+// pauses their own side too), so no movie keeps playing audio behind the
+// page. A page that refuses framing fires no error event, so a 10s timer
+// shows the blocked banner when no load arrives.
+function mountWeblink(url, force = false, at = 0) {
+  const clean = normalizeWebUrl(url);
+  if (!clean) return false;
+  if (!force && clean === state.lastMountedWeblinkUrl && state.webViewerLoaded) return true;
+  // Leave any shared movie first — the room moved to the web page.
+  stopMovieShare();
+  if (state.receivingMovie) stopReceivingMovie();
+  // Pause local playback without broadcasting: the partner is mounting
+  // the same page and pausing their own side at the same moment.
+  if (state.mediaType === 'youtube' && state.ytPlayer && typeof state.ytPlayer.pauseVideo === 'function') {
+    try { state.ytPlayer.pauseVideo(); } catch (_) {}
+  }
+  if ((state.mediaType === 'url' || state.mediaType === 'local') && dom.html5VideoPlayer) {
+    try { dom.html5VideoPlayer.pause(); } catch (_) {}
+  }
+  hideMediaError();
+  hideUnmuteOverlay();
+  dom.html5VideoPlayer.classList.add('hidden');
+  dom.youtubePlayerWrapper.classList.add('hidden');
+  dom.emptyPlayerPlaceholder.classList.add('hidden');
+  setStageMode('web');
+  state.mediaType = 'web';
+  state.mediaUrl = clean;
+  state.mediaTitle = weblinkTitleForUrl(clean);
+  dom.nowPlayingBanner.classList.remove('hidden');
+  dom.nowPlayingTitle.textContent = state.mediaTitle;
+  dom.webAddressText.textContent = clean;
+  if (dom.webOpenExternalBtn) dom.webOpenExternalBtn.href = clean;
+  dom.webBlockedBanner.classList.add('hidden');
+  dom.webBrowserWrapper.classList.remove('hidden');
+  state.webViewerLoaded = false;
+  state.webExpectedUrl = clean;
+  state.lastMountedWeblinkUrl = clean;
+  state.lastMountedWeblinkAt = at || Date.now();
+  clearTimeout(state.weblinkLoadTimer);
+  state.weblinkLoadTimer = setTimeout(() => {
+    if (!state.webViewerLoaded && state.lastMountedWeblinkUrl === clean) {
+      dom.webBlockedBanner.classList.remove('hidden');
+    }
+  }, 10000);
+  const currentSrc = webFrameCurrentSrc();
+  const samePage = currentSrc === clean || currentSrc === clean + '/';
+  if (force && samePage) {
+    // Same page, asked to reload: reload() keeps the URL (a cache-buster
+    // would change what the address bar shows and what some pages do).
+    try {
+      if (dom.webBrowserFrame.contentWindow && dom.webBrowserFrame.contentWindow.location) {
+        dom.webBrowserFrame.contentWindow.location.reload();
+        return true;
+      }
+    } catch (_) { /* fall through to a cache-busted re-assign */ }
+    const busted = clean + (clean.indexOf('?') === -1 ? '?' : '&') + 'c2t=' + Date.now();
+    state.webFrameSrc = busted;
+    dom.webBrowserFrame.src = busted;
+    return true;
+  }
+  state.webFrameSrc = clean;
+  dom.webBrowserFrame.src = clean;
+  return true;
+}
+
+// The iframe's current src — via the attribute in a real browser (the
+// .src property returns the resolved URL, which adds a trailing slash
+// the attribute does not have). Falls back to .src where getAttribute
+// does not exist.
+function webFrameCurrentSrc() {
+  try {
+    if (dom.webBrowserFrame && typeof dom.webBrowserFrame.getAttribute === 'function') {
+      return dom.webBrowserFrame.getAttribute('src') || '';
+    }
+  } catch (_) {}
+  return (dom.webBrowserFrame && dom.webBrowserFrame.src) || '';
+}
+
+// Leave the mini-browser: stop the page, clear the blocked timer, hand
+// the stage back to the video player. Called by every video mount.
+function hideWebViewer() {
+  clearTimeout(state.weblinkLoadTimer);
+  state.weblinkLoadTimer = null;
+  state.webViewerLoaded = false;
+  state.webExpectedUrl = '';
+  state.webFrameSrc = '';
+  state.lastMountedWeblinkUrl = '';
+  state.lastMountedWeblinkAt = 0;
+  if (dom.webBrowserWrapper) dom.webBrowserWrapper.classList.add('hidden');
+  if (dom.webBlockedBanner) dom.webBlockedBanner.classList.add('hidden');
+  if (dom.webBrowserFrame) {
+    try { dom.webBrowserFrame.removeAttribute('src'); } catch (_) {}
+  }
+  setStageMode('video');
+}
+
+// The room's current web page, if any: mount the newest shared link when
+// it is newer than the room's video. Runs on every render, so joins,
+// reconnects and refreshes all restore the page — but the mount guard
+// means an already-open page is never reloaded by a re-render.
+function maybeMountSavedWeblink() {
+  const latest = latestWeblink(state.roomData && state.roomData.weblinks);
+  if (!latest) return;
+  if (latest.url === state.lastMountedWeblinkUrl) return;
+  if (!isWeblinkNewerThanMedia(latest, state.roomData.media)) return;
+  mountWeblink(latest.url, false, latest.createdAt);
+}
+
+// Share a web page with the room: log it (so it syncs, survives refresh
+// and lands in the .jsonl backup), mount it here, and send it live.
+function shareWeblink(rawUrl, force = false) {
+  const clean = normalizeWebUrl(rawUrl);
+  if (!clean) {
+    showToast('Paste a full web address, starting with https://', 'rose');
+    return false;
+  }
+  if (!state.roomCode) return false;
+  const line = appendLog('weblink', {
+    url: clean,
+    title: weblinkTitleForUrl(clean),
+    sharedByName: state.userName
+  });
+  replayLog();
+  renderWeblinkShelf(state.roomData.weblinks);
+  mountWeblink(clean, force, line.at);
+  sendPeerMessage({ kind: 'log-line', from: state.userId, fromName: state.userName, at: Date.now(), line });
+  showToast('Web page shared — tap "Start watching" to browse it together', 'emerald');
+  return true;
+}
+
+// The shared-links shelf: one button per URL, newest first. Tapping one
+// shares it again, so both sides move to that page together.
+function renderWeblinkShelf(weblinks) {
+  const unique = uniqueWeblinks(weblinks || []);
+  if (!dom.weblinkShelf) return;
+  if (!unique.length) {
+    dom.weblinkShelf.innerHTML = '';
+    if (dom.weblinkShelfEmpty) dom.weblinkShelfEmpty.classList.remove('hidden');
+    return;
+  }
+  if (dom.weblinkShelfEmpty) dom.weblinkShelfEmpty.classList.add('hidden');
+  dom.weblinkShelf.innerHTML = unique.map((w) => {
+    const host = escapeHtml(weblinkTitleForUrl(w.url).replace(/^Web — /, ''));
+    const shownBy = w.sharedByName ? ` · shared by ${escapeHtml(w.sharedByName)}` : '';
+    return `<button type="button" data-weblink-url="${escapeHtml(w.url)}" class="weblink-shelf-btn w-full text-left p-3 rounded-[6px] bg-canvas-background hover:bg-surface-control border border-hairline-border hover:border-primary-container/40 transition cursor-pointer">`
+      + `<span class="block text-xs font-semibold text-text-primary truncate">${host}</span>`
+      + `<span class="block text-[11px] text-text-muted truncate">${escapeHtml(w.url)}${shownBy}</span>`
+      + `</button>`;
+  }).join('');
 }
 
 function syncMediaToRoom(type, url, title, localFileName = '', videoId = '') {
@@ -4183,6 +4497,7 @@ function enterTheaterUI(code) {
   // Fresh room, fresh sync cursors — stale ones from the previous room
   // would drop or mis-apply the new room's first messages.
   state.lastMountedMediaKey = '';
+  hideWebViewer();
   state.lastProcessedSeq = 0;
   state.lastSeqBySender = {};
   state.lastWhisperCount = 0;
@@ -4986,6 +5301,54 @@ dom.urlLoadForm.addEventListener('submit', async (e) => {
     syncMediaToRoom('url', rawUrl, cleanTitle);
     showToast('Video URL synced to room 🎬', 'emerald');
   }
+});
+
+// Shared mini-browser: paste any web page link — it is shared to the
+// room, and both sides open it in the in-app browser.
+dom.weblinkLoadForm.addEventListener('submit', (e) => {
+  e.preventDefault();
+  const rawUrl = dom.weblinkUrlInput.value.trim();
+  if (!rawUrl) {
+    showToast('Paste a web page link first', 'rose');
+    return;
+  }
+  shareWeblink(rawUrl);
+});
+
+// Mini-browser address bar: Sync page reloads the shared page on both
+// sides (a fresh weblink line, so it travels the normal log path).
+dom.webSyncPageBtn.addEventListener('click', () => {
+  if (!state.lastMountedWeblinkUrl) return;
+  shareWeblink(state.lastMountedWeblinkUrl, true);
+});
+
+// Blocked-site banner: dismiss it (the page may still load underneath).
+dom.webBlockedDismissBtn.addEventListener('click', () => {
+  dom.webBlockedBanner.classList.add('hidden');
+});
+
+// The iframe fired a load: the page is in (or at least the browser got
+// an answer). Ignore loads that are not the expected page — the
+// about:blank used when tearing the viewer down fires one too.
+dom.webBrowserFrame.addEventListener('load', () => {
+  if (!state.webExpectedUrl) return;
+  const cur = webFrameCurrentSrc();
+  const exp = state.webFrameSrc || state.webExpectedUrl;
+  if (cur !== exp && cur !== exp + '/') return;
+  state.webViewerLoaded = true;
+  clearTimeout(state.weblinkLoadTimer);
+  dom.webBlockedBanner.classList.add('hidden');
+});
+
+// Shared-links shelf: tap a link to move the whole room to that page.
+dom.weblinkShelf.addEventListener('click', (e) => {
+  const btn = (e.target && typeof e.target.closest === 'function')
+    ? e.target.closest('[data-weblink-url]')
+    : null;
+  if (!btn) return;
+  const url = (btn.dataset && btn.dataset.weblinkUrl)
+    || (typeof btn.getAttribute === 'function' && btn.getAttribute('data-weblink-url'));
+  if (url) shareWeblink(url, url === state.lastMountedWeblinkUrl);
 });
 
 // Load Local Video File
